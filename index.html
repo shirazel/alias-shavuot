@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אליאס שבועות</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Assistant', sans-serif;
+            background-color: #fafaf9;
+            background-image: radial-gradient(#d1fae5 2px, transparent 2px);
+            background-size: 30px 30px;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card-shadow {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+        }
+
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+
+        .game-card {
+            transform-style: preserve-3d;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .bounce-in {
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+        }
+        
+        .thief-space {
+            background-color: #ecfdf5;
+            border: 2px solid #10b981;
+            color: #064e3b;
+            box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.1);
+        }
+
+        .team-icon-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            z-index: 10;
+            line-height: 1;
+        }
+
+        .no-scroll {
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+        // מאגר המילים של שבועות
+        const WORDS_POOL = [
+            "חג שבועות", "ביכורים", "טנא", "הר סיני", "מתן תורה", "עשרת הדיברות", "לוחות הברית", "משה רבנו",
+            "עוגת גבינה", "חלב", "פרה", "חקלאות", "מים", "זר פרחים", "לבן", "קציר",
+            "חיטה", "שעורה", "גפן", "תאנה", "רימון", "זית", "דבש", "שבעת המינים",
+            "מגילת רות", "נעמי", "בועז", "אדמה", "שדה", "טרקטור", "מגל", "פירות",
+            "תנובה", "כבשה", "יוגורט", "חמאה", "מעדן", "גלידה", "חג הקציר", "חג הביכורים",
+            "עצרת", "תיקון ליל שבועות", "בלינצ'ס", "פשטידה", "כרם", "פרדס", "מעיין", "שמש",
+            "תבואה", "אלומות", "אוהל", "מדבר", "לחם", "בגדים לבנים", "תפילה", "ארץ זבת חלב",
+            "ירושלים", "בית המקדש", "ענבים", "שמן זית", "דבורה", "כוורת", "כד חלב", "ספירת העומר",
+            "פיצה", "טוסט", "רובה מים", "השפרצה", "בריכה", "חקלאי", "קצפת", "שבועה",
+            "גבינה צהובה", "גבינה לבנה", "רפת", "עטינים", "חציר", "תורה", "אותיות", "קריאה",
+            "מגילה", "קציר חיטים", "מחרשה", "אפייה", "קמח", "בצק", "שמרים", "פחמימות"
+        ];
+
+        const BOARD_SIZE = 100;
+        const ROUND_TIME = 60;
+
+        const shuffleArray = (array) => {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        };
+
+        const getRandomWords = (pool, count) => shuffleArray(pool).slice(0, count);
+
+        const channel = new BroadcastChannel('alias_game_channel');
+
+        const App = () => {
+            const [isProjector] = useState(() => {
+                return window.__FORCE_PROJECTOR || window.location.hash.includes('mode=projector') || new URLSearchParams(window.location.search).get('mode') === 'projector';
+            });
+
+            const projWinRef = useRef(null);
+            const [gameState, setGameState] = useState('SETUP');
+            const [teams, setTeams] = useState([
+                { id: 0, name: 'קבוצה 1', color: 'bg-blue-500', icon: '🧀', score: 1 }, 
+                { id: 1, name: 'קבוצה 2', color: 'bg-orange-500', icon: '🌾', score: 1 }
+            ]);
+            const [activeTeamIndex, setActiveTeamIndex] = useState(0);
+            const [timeLeft, setTimeLeft] = useState(ROUND_TIME);
+            const [currentCardWords, setCurrentCardWords] = useState([]);
+            const [turnPoints, setTurnPoints] = useState({}); 
+            const [turnPenalties, setTurnPenalties] = useState(0);
+
+            // חישובים גלובליים
+            const currentActiveTeam = teams[activeTeamIndex] || teams[0];
+            const currentSpace = currentActiveTeam.score;
+            const targetWordIndex = (currentSpace - 1) % 8; 
+            const isRobberyTurn = currentSpace % 8 === 0;
+
+            const stateRef = useRef({ gameState, teams, activeTeamIndex, timeLeft, currentCardWords, turnPoints, turnPenalties });
+            useEffect(() => {
+                stateRef.current = { gameState, teams, activeTeamIndex, timeLeft, currentCardWords, turnPoints, turnPenalties };
+            }, [gameState, teams, activeTeamIndex, timeLeft, currentCardWords, turnPoints, turnPenalties]);
+
+            const broadcastState = useCallback((newState) => {
+                if (!isProjector) {
+                    const payload = {
+                        type: 'SYNC_STATE',
+                        state: {
+                            gameState: newState.gameState !== undefined ? newState.gameState : stateRef.current.gameState,
+                            teams: newState.teams !== undefined ? newState.teams : stateRef.current.teams,
+                            activeTeamIndex: newState.activeTeamIndex !== undefined ? newState.activeTeamIndex : stateRef.current.activeTeamIndex,
+                            timeLeft: newState.timeLeft !== undefined ? newState.timeLeft : stateRef.current.timeLeft,
+                            currentCardWords: newState.currentCardWords !== undefined ? newState.currentCardWords : stateRef.current.currentCardWords,
+                            turnPoints: newState.turnPoints !== undefined ? newState.turnPoints : stateRef.current.turnPoints,
+                            turnPenalties: newState.turnPenalties !== undefined ? newState.turnPenalties : stateRef.current.turnPenalties,
+                        }
+                    };
+                    try { localStorage.setItem('alias_game_sync', JSON.stringify(payload.state)); } catch(e) {}
+                    channel.postMessage(payload);
+                    if (projWinRef.current) projWinRef.current.postMessage(payload, '*');
+                }
+            }, [isProjector]);
+
+            const forceRefresh = useCallback(() => {
+                try {
+                    const savedState = localStorage.getItem('alias_game_sync');
+                    if (savedState) {
+                        const parsed = JSON.parse(savedState);
+                        setGameState(parsed.gameState);
+                        setTeams(parsed.teams);
+                        setActiveTeamIndex(parsed.activeTeamIndex);
+                        setTimeLeft(parsed.timeLeft);
+                        setCurrentCardWords(parsed.currentCardWords);
+                        setTurnPoints(parsed.turnPoints);
+                        setTurnPenalties(parsed.turnPenalties);
+                    }
+                } catch (e) {}
+            }, []);
+
+            useEffect(() => {
+                const handleMessage = (event) => {
+                    const data = event.data;
+                    if (!data) return;
+                    if (data.type === 'SYNC_STATE') {
+                        setGameState(data.state.gameState);
+                        setTeams(data.state.teams);
+                        setActiveTeamIndex(data.state.activeTeamIndex);
+                        setTimeLeft(data.state.timeLeft);
+                        setCurrentCardWords(data.state.currentCardWords);
+                        setTurnPoints(data.state.turnPoints);
+                        setTurnPenalties(data.state.turnPenalties);
+                    }
+                };
+                channel.addEventListener('message', handleMessage);
+                window.addEventListener('message', handleMessage);
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'alias_game_sync' && e.newValue) {
+                        const parsed = JSON.parse(e.newValue);
+                        setGameState(parsed.gameState);
+                        setTeams(parsed.teams);
+                        setActiveTeamIndex(parsed.activeTeamIndex);
+                        setTimeLeft(parsed.timeLeft);
+                        setCurrentCardWords(parsed.currentCardWords);
+                        setTurnPoints(parsed.turnPoints);
+                        setTurnPenalties(parsed.turnPenalties);
+                    }
+                });
+                if (isProjector) forceRefresh();
+                return () => {
+                    channel.removeEventListener('message', handleMessage);
+                    window.removeEventListener('message', handleMessage);
+                };
+            }, [isProjector, forceRefresh]);
+
+            useEffect(() => {
+                let timer;
+                if (!isProjector && gameState === 'PLAYING' && !isRobberyTurn && timeLeft > 0) {
+                    timer = setInterval(() => {
+                        const newTime = timeLeft - 1;
+                        setTimeLeft(newTime);
+                        broadcastState({ timeLeft: newTime });
+                    }, 1000);
+                } else if (!isProjector && gameState === 'PLAYING' && !isRobberyTurn && timeLeft === 0) {
+                    setGameState('SUMMARY');
+                    broadcastState({ gameState: 'SUMMARY' });
+                }
+                return () => clearInterval(timer);
+            }, [gameState, timeLeft, isProjector, isRobberyTurn, broadcastState]);
+
+            const openProjectorWindow = () => {
+                const newWin = window.open('', '_blank', 'width=1024,height=768');
+                if (newWin) {
+                    let htmlContent = document.documentElement.outerHTML;
+                    htmlContent = htmlContent.replace('<head>', '<head><script>window.__FORCE_PROJECTOR = true;</scr' + 'ipt>');
+                    newWin.document.write('<!DOCTYPE html>\n' + htmlContent);
+                    newWin.document.close();
+                    projWinRef.current = newWin;
+                }
+            };
+
+            const displayTeams = useMemo(() => {
+                if (gameState === 'SUMMARY') {
+                    return teams.map(t => {
+                        const points = turnPoints[t.id] || 0;
+                        const penalty = t.id === activeTeamIndex ? turnPenalties : 0;
+                        return { ...t, score: Math.max(1, t.score + points - penalty) };
+                    });
+                }
+                return teams;
+            }, [gameState, teams, turnPoints, turnPenalties, activeTeamIndex]);
+
+            const startTurn = () => {
+                setTimeLeft(ROUND_TIME);
+                const initialPoints = {};
+                teams.forEach(t => initialPoints[t.id] = 0);
+                setTurnPoints(initialPoints);
+                setTurnPenalties(0);
+                const newWords = getRandomWords(WORDS_POOL, 8);
+                setCurrentCardWords(newWords);
+                setGameState('PLAYING');
+                broadcastState({ timeLeft: ROUND_TIME, turnPoints: initialPoints, turnPenalties: 0, currentCardWords: newWords, gameState: 'PLAYING' });
+            };
+
+            const handleAnswer = (winningTeamId) => {
+                let nPoints = { ...turnPoints };
+                let nPenalties = turnPenalties;
+                if (winningTeamId === 'SKIP') {
+                    nPenalties++;
+                    setTurnPenalties(nPenalties);
+                } else {
+                    nPoints[winningTeamId] = (nPoints[winningTeamId] || 0) + 1;
+                    setTurnPoints(nPoints);
+                }
+                const nWords = getRandomWords(WORDS_POOL, 8);
+                setCurrentCardWords(nWords);
+                broadcastState({ turnPenalties: nPenalties, turnPoints: nPoints, currentCardWords: nWords });
+            };
+
+            const endTurnAndReturnToBoard = () => {
+                const nTeams = teams.map(t => {
+                    const p = turnPoints[t.id] || 0;
+                    const pen = t.id === activeTeamIndex ? turnPenalties : 0;
+                    return { ...t, score: Math.max(1, t.score + p - pen) };
+                });
+                setTeams(nTeams);
+                let nextState = nTeams.some(t => t.score >= BOARD_SIZE) ? 'WINNER' : 'BOARD';
+                let nextIndex = (activeTeamIndex + 1) % nTeams.length;
+                setGameState(nextState);
+                if (nextState !== 'WINNER') setActiveTeamIndex(nextIndex);
+                broadcastState({ teams: nTeams, gameState: nextState, activeTeamIndex: nextIndex });
+            };
+
+            // תצוגת מקרן
+            if (isProjector) {
+                return (
+                    <div className="no-scroll flex flex-col p-2 md:p-4 bg-gray-50/30 overflow-hidden relative">
+                        <div className="flex flex-col gap-2 w-full h-full min-h-0 pt-4">
+                            {gameState === 'PLAYING' && (
+                                <div className={`flex items-center justify-center gap-4 py-2 px-8 mx-auto w-max rounded-full card-shadow shrink-0 ${isRobberyTurn ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white animate-pulse' : 'bg-white border-2 border-emerald-100'}`}>
+                                    {!isRobberyTurn ? (
+                                        <><div className="text-2xl font-bold">זמן:</div><div className={`text-6xl font-black ${timeLeft <= 10 ? 'text-red-500' : 'text-emerald-800'}`}>{timeLeft}</div></>
+                                    ) : (
+                                        <div className="text-3xl font-black px-4 py-2">🚨 סיבוב גנב! כולם מנחשים 🚨</div>
+                                    )}
+                                </div>
+                            )}
+                            {gameState === 'SUMMARY' && (
+                                <div className="flex items-center justify-center gap-4 py-2 px-8 mx-auto w-max rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white card-shadow bounce-in shrink-0">
+                                    <h2 className="text-3xl font-black">הזמן נגמר! ⏰</h2>
+                                    <p className="text-xl font-bold border-r-2 border-white/50 pr-3">הקבוצות מתקדמות...</p>
+                                </div>
+                            )}
+                            <div className="flex-grow bg-white rounded-[2rem] p-4 card-shadow border border-green-100 flex flex-col min-h-0">
+                                <div className="text-center mb-2 shrink-0">
+                                    {gameState === 'SETUP' ? (
+                                        <><h2 className="text-4xl font-black text-green-800 mb-1">ברוכים הבאים לאליאס שבועות! 🌾</h2><p className="text-lg text-green-600 font-bold animate-pulse">הקבוצות מתארגנות...</p></>
+                                    ) : (
+                                        <h2 className="text-3xl font-black text-green-800">{gameState === 'SUMMARY' ? 'סיכום התור' : `תור: ${currentActiveTeam.icon} ${currentActiveTeam.name}`}</h2>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-10 grid-rows-10 gap-1 bg-gray-50 p-2 rounded-3xl shadow-inner border border-gray-200/60 flex-grow min-h-0">
+                                    {Array.from({ length: BOARD_SIZE }).map((_, i) => {
+                                        const sNum = i + 1;
+                                        const isT = sNum % 8 === 0;
+                                        const dNum = ((sNum - 1) % 8) + 1;
+                                        const tHere = displayTeams.filter(t => t.score === sNum);
+                                        return (
+                                            <div key={sNum} className={`border rounded-lg flex flex-col items-center justify-center relative min-h-0 ${isT ? 'thief-space border-2' : 'bg-white border-gray-200'}`}>
+                                                <span className={`font-bold absolute top-0.5 right-1 text-[1.5vmin] ${isT ? 'text-green-800' : 'text-gray-300'}`}>{dNum}</span>
+                                                <div className="w-full h-full flex items-center justify-center flex-wrap content-center pt-2">
+                                                    {tHere.map(t => <span key={t.id} className={`text-[5.5vmin] drop-shadow-md transition-all duration-500 ${t.id === activeTeamIndex && gameState !== 'PLAYING' && gameState !== 'SETUP' ? 'animate-bounce' : ''}`}>{t.icon}</span>)}
+                                                </div>
+                                                {sNum === BOARD_SIZE && <span className="absolute inset-0 flex items-center justify-center text-[4vmin] opacity-20">🏆</span>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // תצוגת שליטה - Setup
+            if (gameState === 'SETUP') {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50/50 relative">
+                        <button onClick={openProjectorWindow} className="absolute top-6 left-6 bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-full font-bold shadow-sm hover:bg-emerald-50 transition-all">📽️ פתח חלון למקרן</button>
+                        <div className="bg-white p-8 rounded-[2rem] card-shadow w-full max-w-md border border-emerald-50">
+                            <h1 className="text-5xl font-extrabold text-emerald-800 mb-4 tracking-tighter">אליאס שבועות</h1>
+                            <p className="text-gray-500 mb-8 font-medium">הסבירו את המילה מבלי להשתמש בשורש שלה!</p>
+                            <form onSubmit={(e) => { e.preventDefault(); setGameState('BOARD'); broadcastState({ gameState: 'BOARD', teams }); }} className="space-y-4">
+                                <div className="space-y-3 max-h-64 overflow-y-auto p-1">
+                                    {teams.map((t, index) => (
+                                        <div key={t.id} className="flex items-center gap-2">
+                                            <div className="bg-emerald-50 w-10 h-10 rounded-full flex items-center justify-center text-xl">{t.icon}</div>
+                                            <input type="text" value={t.name} onChange={(e) => { const nt = [...teams]; nt[index].name = e.target.value; setTeams(nt); broadcastState({ teams: nt }); }} className="flex-grow bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 font-bold focus:outline-none" />
+                                            {teams.length > 2 && index === teams.length - 1 && <button type="button" onClick={() => { const ft = teams.filter(tm => tm.id !== t.id); setTeams(ft); broadcastState({ teams: ft }); }} className="text-red-400 p-2">🗑️</button>}
+                                        </div>
+                                    ))}
+                                </div>
+                                {teams.length < 6 && <button type="button" onClick={() => setTeams([...teams, { id: teams.length, name: `קבוצה ${teams.length + 1}`, color: 'bg-green-500', icon: '🍇', score: 1 }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 py-3 rounded-xl font-bold">+ הוסף קבוצה</button>}
+                                <button type="submit" className="w-full mt-8 bg-gradient-to-r from-emerald-400 to-teal-500 text-white font-bold text-xl py-4 rounded-2xl shadow-lg shadow-emerald-100 active:scale-95 transition-all">בואו נשחק!</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            // תצוגת שליטה - Board
+            if (gameState === 'BOARD') {
+                return (
+                    <div className="min-h-screen flex flex-col p-4 bg-gray-50/30 relative">
+                        <button onClick={() => { setGameState('SETUP'); broadcastState({ gameState: 'SETUP' }); }} className="absolute top-4 right-4 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-bold border border-emerald-200">⚙️ עמוד פתיחה</button>
+                        <div className="flex flex-col xl:flex-row gap-8 max-w-7xl mx-auto w-full mt-10">
+                            <div className="xl:flex-[2.5] bg-white rounded-[2rem] p-6 card-shadow border border-green-100">
+                                <h2 className="text-3xl font-black text-center text-green-800 mb-8">מפת המשחק</h2>
+                                <div className="board-grid bg-gray-50 p-4 rounded-2xl border border-gray-200/60 shadow-inner">
+                                    {Array.from({ length: BOARD_SIZE }).map((_, i) => {
+                                        const sNum = i + 1;
+                                        const tHere = teams.filter(t => t.score === sNum);
+                                        return (
+                                            <div key={sNum} className={`aspect-square border rounded-xl flex items-center justify-center relative transition-all ${sNum % 8 === 0 ? 'thief-space' : 'bg-white border-gray-200 hover:border-emerald-300'}`}>
+                                                <span className="text-[10px] font-bold absolute top-0.5 right-1 text-gray-300">{(sNum-1)%8+1}</span>
+                                                <div className="team-icon-wrapper">{tHere.map(t => <span key={t.id} className={`text-2xl drop-shadow-sm ${t.id === activeTeamIndex ? 'animate-bounce' : ''}`}>{t.icon}</span>)}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="xl:flex-1 w-full flex flex-col">
+                                <div className={`text-center rounded-[2rem] p-8 card-shadow border transition-all ${isRobberyTurn ? 'bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-emerald-200' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                    <h3 className="text-4xl font-black mb-4">{currentActiveTeam.icon} {currentActiveTeam.name}</h3>
+                                    {isRobberyTurn ? <div className="bg-white/20 p-5 rounded-2xl mb-8 border border-white/30 animate-pulse">🚨 שוד! כולם מנחשים 🚨</div> : <div className="mb-8 bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><p className="text-emerald-800 font-bold">המילה שלכם:</p><span className="text-5xl font-black text-emerald-600 block mt-1">{targetWordIndex + 1}</span></div>}
+                                    <button onClick={startTurn} className="w-full bg-emerald-500 text-white font-black text-2xl py-6 rounded-2xl shadow-lg active:scale-95 transition-all">{isRobberyTurn ? 'התחל שוד 🚨' : 'התחל טיימר ⏱️'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // תצוגת שליטה - Playing
+            if (gameState === 'PLAYING') {
+                return (
+                    <div className="min-h-screen flex flex-col max-w-md mx-auto p-4 pt-12 relative overflow-hidden">
+                        <button onClick={() => { setGameState('SETUP'); broadcastState({ gameState: 'SETUP' }); }} className="absolute top-4 right-4 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold border border-emerald-200">⚙️ עמוד פתיחה</button>
+                        <div className={`flex justify-between items-center p-4 rounded-2xl card-shadow bg-white border-b-4 mb-6 ${isRobberyTurn ? 'border-emerald-600 bg-emerald-50' : 'border-emerald-400'}`}>
+                            <div className="font-bold text-xl">{currentActiveTeam.icon} {currentActiveTeam.name}</div>
+                            <div className={`text-3xl font-black px-4 py-1 rounded-xl ${timeLeft <= 10 && !isRobberyTurn ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-100 text-emerald-800'}`}>{isRobberyTurn ? '🚨' : timeLeft}</div>
+                        </div>
+                        <div className="flex-grow flex flex-col justify-center my-2 perspective-1000">
+                            <div className="bg-white rounded-[2.5rem] p-6 card-shadow border border-gray-100 game-card flex flex-col gap-2 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-full h-2 bg-emerald-400 opacity-20"></div>
+                                {currentCardWords.map((word, idx) => {
+                                    const isTarget = idx === targetWordIndex;
+                                    return (
+                                        <div key={idx} className={`flex items-center p-3 rounded-2xl transition-all duration-300 ${isTarget ? 'bg-emerald-500 text-white scale-105 shadow-xl font-bold' : 'opacity-30 blur-[0.5px]'}`}>
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black ml-4 shrink-0 ${isTarget ? 'bg-white text-emerald-600 shadow-inner' : 'bg-gray-200 text-gray-400'}`}>{idx + 1}</div>
+                                            <div className="text-2xl">{word}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-3 mt-6">
+                            <div className="flex gap-3">
+                                <button onClick={() => handleAnswer('SKIP')} className="flex-1 bg-white text-rose-500 py-4 rounded-2xl font-bold border-2 border-rose-100 active:scale-95 transition-all">❌ דילוג (-1)</button>
+                                {!isRobberyTurn ? (
+                                    <button onClick={() => handleAnswer(currentActiveTeam.id)} className="flex-[2] bg-emerald-500 text-white py-4 rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all">✅ נכון!</button>
+                                ) : (
+                                    <div className="flex-[2] grid grid-cols-2 gap-2">
+                                        {teams.map(t => <button key={t.id} onClick={() => handleAnswer(t.id)} className="bg-emerald-50 border-2 border-emerald-200 text-emerald-700 py-2 rounded-xl text-sm font-black active:scale-95 transition-all">{t.icon} {t.name}</button>)}
+                                    </div>
+                                )}
+                            </div>
+                            {isRobberyTurn && <button onClick={() => { setGameState('SUMMARY'); broadcastState({ gameState: 'SUMMARY' }); }} className="w-full bg-emerald-800 text-white py-4 rounded-2xl font-black shadow-md active:scale-95 transition-all">🛑 סיום סיבוב שוד</button>}
+                            {!isRobberyTurn && <button onClick={() => setTimeLeft(0)} className="w-full bg-gray-100 text-gray-400 py-2 rounded-xl text-xs font-bold">⏩ סיים תור לבדיקה</button>}
+                        </div>
+                    </div>
+                );
+            }
+
+            // תצוגת שליטה - Summary
+            if (gameState === 'SUMMARY') {
+                const sPoints = turnPoints[currentActiveTeam.id] || 0;
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50/50">
+                        <div className="bg-white p-10 rounded-[2.5rem] card-shadow w-full max-w-sm border-2 border-emerald-50 bounce-in text-center">
+                            <h2 className="text-4xl font-black mb-8 text-emerald-800">סיכום התור ⏰</h2>
+                            <div className="bg-gray-50 p-6 rounded-3xl mb-8 space-y-4 border border-gray-100 shadow-inner text-right">
+                                {isRobberyTurn ? teams.map(t => turnPoints[t.id] > 0 && <div key={t.id} className="flex justify-between font-bold"><span>{t.icon} {t.name}</span><span className="text-green-600">+{turnPoints[t.id]}</span></div>) : <div className="flex justify-between font-bold text-xl"><span>נכונות:</span><span className="text-green-600">{sPoints}</span></div>}
+                                <div className="flex justify-between font-bold text-rose-500"><span>דילוגים:</span><span>{turnPenalties}</span></div>
+                                {!isRobberyTurn && <div className="border-t-2 border-dashed border-gray-200 pt-6 font-black text-2xl text-emerald-900"><span>סה"כ צעדים:</span><span dir="ltr">{(sPoints - turnPenalties) >= 0 ? `+${sPoints - turnPenalties}` : (sPoints - turnPenalties)}</span></div>}
+                            </div>
+                            <button onClick={endTurnAndReturnToBoard} className="w-full bg-emerald-500 text-white font-black text-xl py-5 rounded-2xl shadow-lg active:scale-95 transition-all">חזרה למפה 🗺️</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // מסך שליטה - Winner
+            if (gameState === 'WINNER') {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center text-center bg-gradient-to-br from-emerald-600 to-teal-800 text-white p-6">
+                        <div className="text-[10rem] mb-4 drop-shadow-2xl">🏆</div>
+                        <h1 className="text-6xl font-black mb-8">יש לנו מנצח!</h1>
+                        <button onClick={() => { const reset = teams.map(t=>({...t,score:1})); setTeams(reset); setGameState('SETUP'); broadcastState({ teams: reset, gameState: 'SETUP' }); }} className="bg-white text-emerald-800 font-black py-5 px-16 rounded-full text-2xl shadow-2xl active:scale-95 transition-all">משחק חדש 🔄</button>
+                    </div>
+                );
+            }
+            return null;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

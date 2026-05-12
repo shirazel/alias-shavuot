@@ -26,6 +26,7 @@
             margin: 0;
             padding: 0;
             user-select: none;
+            touch-action: manipulation; /* אופטימיזציה למגע */
         }
 
         .board-grid {
@@ -86,7 +87,7 @@
             "מגילה", "קציר חיטים", "מחרשה", "אפייה", "קמח", "בצק", "שמרים", "פחמימות"
         ];
 
-        // מנגנון צלילים
+        // מנגנון צלילים (Web Audio API)
         const playSound = (type) => {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -119,8 +120,8 @@
             } catch (e) {}
         };
 
-        const SYNC_KEY = 'alias_shavuot_sync_v17';
-        const channel = new BroadcastChannel('shavuot_channel_v17');
+        const SYNC_KEY = 'alias_shavuot_sync_v19';
+        const channel = new BroadcastChannel('shavuot_channel_v19');
 
         const App = () => {
             const [isProjector] = useState(() => window.location.search.includes('mode=projector'));
@@ -225,28 +226,27 @@
 
             if (isProjector) {
                 return (
-                    <div className="h-screen overflow-hidden flex flex-col p-4 bg-gray-50 text-center">
-                        <div className="flex flex-col h-full gap-4">
+                    <div className="h-screen overflow-hidden flex flex-col p-2 md:p-4 bg-gray-50 text-center">
+                        <div className="flex flex-col h-full gap-2 md:gap-4">
                             {gameState === 'PLAYING' && (
-                                <div className="mx-auto bg-white border border-emerald-100 rounded-full py-4 px-12 shadow-sm">
-                                    {isRobbery ? <div className="text-3xl font-bold text-emerald-600 animate-pulse">🚨 סיבוב גנב! כולם מנחשים 🚨</div> : <div className="text-6xl font-bold text-emerald-800">{timeLeft}</div>}
+                                <div className="mx-auto bg-white border border-emerald-100 rounded-full py-2 md:py-4 px-8 md:px-12 shadow-sm">
+                                    {isRobbery ? <div className="text-xl md:text-3xl font-bold text-emerald-600 animate-pulse">🚨 סיבוב גנב! כולם מנחשים 🚨</div> : <div className="text-4xl md:text-6xl font-bold text-emerald-800">{timeLeft}</div>}
                                 </div>
                             )}
-                            <div className="flex-grow bg-white rounded-[2rem] p-6 shadow-sm border border-emerald-50 flex flex-col">
-                                <h2 className="text-3xl font-bold text-emerald-800 mb-4">
-                                    {gameState === 'SETUP' ? 'ברוכים הבאים! 🌾' : (gameState === 'WINNER' ? 'יש מנצחים! 🏆' : `תור: ${activeTeam.icon} ${activeTeam.name}`)}
+                            <div className="flex-grow bg-white rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-6 shadow-sm border border-emerald-50 flex flex-col min-h-0">
+                                <h2 className="text-xl md:text-3xl font-bold text-emerald-800 mb-2 md:mb-4">
+                                    {gameState === 'SETUP' ? 'ברוכים הבאים לאליאס שבועות! 🌾' : (gameState === 'WINNER' ? 'יש מנצחים! 🏆' : `תור: ${activeTeam.icon} ${activeTeam.name}`)}
                                 </h2>
-                                <div className="board-grid bg-gray-50 p-2 rounded-2xl flex-grow">
+                                <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-xl md:rounded-2xl flex-grow">
                                     {Array.from({ length: 100 }).map((_, i) => {
                                         const s = i + 1;
                                         const here = teams.filter(t => (gameState === 'SUMMARY' ? Math.max(1, t.score + (points[t.id] || 0) - (t.id === activeTeam.id ? penalties : 0)) : t.score) === s);
                                         return (
                                             <div key={s} className={`border rounded flex items-center justify-center relative ${s % 8 === 0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
-                                                {/* מספרים מוגדלים למקרן */}
-                                                <span className="absolute top-1 right-1 text-[2.2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
+                                                <span className="absolute top-0.5 right-1 text-[1.8vmin] md:text-[2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
                                                 <div className="flex flex-wrap justify-center items-center h-full w-full">
                                                     {here.length > 0 ? (
-                                                        here.map(t => <span key={t.id} className="text-[5.5vmin] drop-shadow-md">{t.icon}</span>)
+                                                        here.map(t => <span key={t.id} className="text-[5vmin] md:text-[5.5vmin] drop-shadow-md">{t.icon}</span>)
                                                     ) : (
                                                         s === 100 ? <span className="text-[4vmin] opacity-10">🏆</span> : null
                                                     )}
@@ -255,7 +255,7 @@
                                         );
                                     })}
                                 </div>
-                                <div className="mt-4 opacity-50 text-[12px] font-medium text-emerald-900">חג שבועות שמח - באהבה פסג"ה חדרה 🌾</div>
+                                <div className="mt-2 opacity-50 text-[10px] md:text-[12px] font-medium text-emerald-900">חג שבועות שמח - באהבה פסג"ה חדרה 🌾</div>
                             </div>
                         </div>
                     </div>
@@ -266,14 +266,25 @@
                 <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 relative">
                     {showInstructions && (
                         <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-right">
+                            <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-right overflow-y-auto max-h-[90vh]">
                                 <h2 className="text-2xl font-bold text-emerald-800 mb-4 border-b pb-2">איך משחקים?</h2>
-                                <div className="space-y-3 text-gray-600 text-sm">
-                                    <p>• מסבירים את המילה בלי להגיד אותה או את שורשה.</p>
-                                    <p>• משבצת ירוקה כהה = "גנב". כולם מנחשים ואין טיימר (עד 5 מילים).</p>
-                                    <p>• לחצו על כפתור המקרן בפינה וגררו את החלון החדש למקרן הכיתה.</p>
+                                <div className="space-y-4 text-gray-600 text-sm">
+                                    <section className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                                        <p className="font-bold text-emerald-800 mb-1">📽️ ניהול בכיתה (מורה):</p>
+                                        <p>• הקרינו את "מסך המקרן" על הלוח הגדול.</p>
+                                        <p>• השאירו את המילים אצלכם בנייד או במחשב (אל תפנו לכיתה).</p>
+                                    </section>
+                                    <section className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                                        <p className="font-bold text-blue-800 mb-1">📱 משחק קבוצתי בנייד:</p>
+                                        <p>• ניתן לשחק בקבוצה קטנה ללא מקרן. פשוט העבירו את הטלפון ממגדיר למגדיר בכל פעם שמתחלף תור.</p>
+                                    </section>
+                                    <section className="border-t pt-3">
+                                        <p className="font-bold">כללי המשחק:</p>
+                                        <p>• מסבירים את המילה מבלי להגיד אותה או את שורשה.</p>
+                                        <p>• משבצת ירוקה כהה = "גנב". כולם מנחשים יחד ואין טיימר.</p>
+                                    </section>
                                 </div>
-                                <button onClick={() => setShowInstructions(false)} className="w-full mt-6 bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg">הבנתי!</button>
+                                <button onClick={() => setShowInstructions(false)} className="w-full mt-6 bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition-all">הבנתי, בואו נתחיל!</button>
                             </div>
                         </div>
                     )}
@@ -283,7 +294,7 @@
                     {gameState === 'SETUP' && (
                         <div className="bg-white p-10 rounded-3xl card-shadow max-w-sm w-full text-center border border-emerald-50">
                             <h1 className="text-4xl font-bold text-emerald-800 mb-2">אליאס שבועות</h1>
-                            <button onClick={() => setShowInstructions(true)} className="instruction-link mb-8 block mx-auto">הוראות משחק</button>
+                            <button onClick={() => setShowInstructions(true)} className="instruction-link mb-8 block mx-auto">הוראות משחק והנחיות</button>
                             <div className="space-y-3">
                                 {teams.map((t, i) => (
                                     <div key={t.id} className="flex items-center gap-2">
@@ -293,34 +304,33 @@
                                     </div>
                                 ))}
                                 <button onClick={() => setTeams([...teams, { id: Date.now(), name: `קבוצה ${teams.length + 1}`, icon: ICONS[teams.length % 10], score: 1 }])} className="w-full border border-dashed border-emerald-200 text-emerald-600 py-2 rounded-xl text-[11px] font-bold">+ הוסף קבוצה</button>
-                                <button onClick={() => { setGameState('BOARD'); broadcast({ gameState: 'BOARD' }); }} className="w-full mt-6 bg-emerald-500 text-white font-bold text-lg py-4 rounded-2xl shadow-lg">בואו נשחק!</button>
+                                <button onClick={() => { setGameState('BOARD'); broadcast({ gameState: 'BOARD' }); }} className="w-full mt-6 bg-emerald-500 text-white font-bold text-lg py-4 rounded-2xl shadow-lg active:scale-95">בואו נשחק!</button>
                             </div>
                         </div>
                     )}
 
                     {gameState === 'BOARD' && (
                         <div className="max-w-5xl w-full flex flex-col xl:flex-row gap-6">
-                            <div className="xl:flex-[2.5] bg-white rounded-3xl p-6 shadow-sm border border-emerald-50">
+                            <div className="xl:flex-[2.5] bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-emerald-50">
                                 <div className="flex justify-between items-center mb-6">
-                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] font-medium">⚙️ הגדרות</button>
+                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] font-medium hover:text-emerald-500 transition-colors">⚙️ הגדרות</button>
                                     <h2 className="text-xl font-bold text-emerald-800">מפת המשחק</h2>
                                     <button onClick={() => setShowInstructions(true)} className="instruction-link">הוראות</button>
                                 </div>
-                                <div className="board-grid bg-gray-50 p-2 rounded-2xl h-[450px]">
+                                <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-2xl h-[400px] md:h-[450px]">
                                     {Array.from({ length: 100 }).map((_, i) => (
                                         <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
-                                            {/* מספרים מוגדלים למורה */}
-                                            <span className="absolute top-0.5 right-1 text-[13px] text-gray-400 font-bold">{(i)%8+1}</span>
+                                            <span className="absolute top-0.5 right-1 text-[11px] text-gray-400 font-bold">{(i)%8+1}</span>
                                             {teams.filter(t => t.score === (i+1)).length > 0 ? (
-                                                teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)
+                                                teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-lg md:text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)
                                             ) : (
-                                                i+1 === 100 ? <span className="text-xl opacity-20">🏆</span> : null
+                                                i+1 === 100 ? <span className="text-lg md:text-xl opacity-20">🏆</span> : null
                                             )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            <div className="xl:flex-1 bg-white p-8 rounded-3xl shadow-sm text-center flex flex-col justify-center border border-emerald-50">
+                            <div className="xl:flex-1 bg-white p-6 md:p-8 rounded-3xl shadow-sm text-center flex flex-col justify-center border border-emerald-50">
                                 <h3 className="text-3xl font-bold mb-4 text-emerald-900">{activeTeam.icon} {activeTeam.name}</h3>
                                 {isRobbery ? <div className="bg-emerald-600 text-white p-4 rounded-xl mb-6 font-bold animate-pulse">🚨 שוד! 5 קלפים לכולם</div> : <div className="bg-emerald-50 p-6 rounded-2xl mb-6 border border-emerald-100 shadow-inner"><p className="text-xs text-gray-400 font-medium uppercase mb-1">המשימה שלכם:</p><span className="text-6xl font-bold text-emerald-600">{targetIdx + 1}</span></div>}
                                 <button onClick={startTurn} className="w-full bg-emerald-500 text-white font-bold text-xl py-6 rounded-2xl shadow-md active:scale-95 transition-all">התחל תור!</button>
@@ -338,7 +348,7 @@
                                 {words.map((word, i) => (
                                     <div key={i} className={`flex items-center p-3 rounded-xl transition-all ${i === targetIdx ? 'bg-emerald-500 text-white scale-105 shadow-lg font-bold' : 'opacity-20 blur-[0.5px]'}`}>
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4 ${i === targetIdx ? 'bg-white text-emerald-600 shadow-inner' : 'bg-gray-100'}`}>{i + 1}</div>
-                                        <div className="text-2xl font-semibold tracking-tight">{word}</div>
+                                        <div className="text-2xl font-semibold tracking-tight leading-tight">{word}</div>
                                     </div>
                                 ))}
                             </div>
@@ -358,7 +368,7 @@
                     {gameState === 'SUMMARY' && (
                         <div className="bg-white p-12 rounded-[2.5rem] card-shadow max-w-sm w-full text-center border border-emerald-50">
                             <h2 className="text-3xl font-bold text-emerald-800 mb-6 tracking-tighter">סיכום התור ⏰</h2>
-                            <div className="bg-gray-50 p-6 rounded-2xl mb-8 space-y-3 text-right font-bold shadow-inner">
+                            <div className="bg-gray-50 p-6 rounded-2xl mb-8 space-y-3 text-right font-bold shadow-inner font-bold">
                                 {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between"><span>{t.icon} {t.name}</span><span className="text-emerald-600 bg-white px-3 py-0.5 rounded-full border border-emerald-50">+{points[t.id]}</span></div>) : <div className="flex justify-between text-xl"><span>נכונות:</span><span className="text-emerald-600 bg-white px-3 py-0.5 rounded-full border border-emerald-50">{points[activeTeam.id] || 0}</span></div>}
                                 <div className="flex justify-between text-rose-500"><span>דילוגים:</span><span>{penalties}</span></div>
                             </div>

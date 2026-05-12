@@ -19,10 +19,10 @@
         @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap');
         
         :root {
-            --brand-green: #008d41; /* הירוק מהתמונה ששלחת */
-            --brand-yellow: #f8b61c; /* הצהוב מהתמונה ששלחת */
-            --bg-light-green: #f1fcf4; /* ירוק בהיר מאוד לרקע */
-            --delicate-black: #374151; /* שחור-אפור עדין לטקסט */
+            --brand-green: #008d41;
+            --brand-yellow: #f8b61c;
+            --bg-light-green: #f1fcf4;
+            --delicate-black: #374151;
         }
 
         body {
@@ -35,6 +35,11 @@
             user-select: none;
             touch-action: manipulation;
         }
+
+        /* הגדרת מחלקות צבע מותאמות אישית שהיו חסרות */
+        .bg-brand-green { background-color: var(--brand-green) !important; }
+        .text-brand-green { color: var(--brand-green) !important; }
+        .border-brand-green { border-color: var(--brand-green) !important; }
 
         .board-grid {
             display: grid;
@@ -63,9 +68,7 @@
             cursor: pointer;
             transition: opacity 0.2s;
         }
-        .instruction-link:hover {
-            opacity: 0.8;
-        }
+        .instruction-link:hover { opacity: 0.8; }
 
         /* עיצוב הלוגו שבוּאס */
         .logo-container {
@@ -90,10 +93,6 @@
             transform: translateY(0.08em); 
         }
 
-        .bg-brand-green { background-color: var(--brand-green); }
-        .text-brand-green { color: var(--brand-green); }
-        
-        /* הגדרות למסך המקרן למניעת איבוד פריטים */
         .projector-wrapper {
             min-height: 100vh;
             overflow-y: auto;
@@ -103,30 +102,25 @@
             scrollbar-color: var(--brand-green) transparent;
         }
 
-        /* כפתור מקרן משופר - טקסט שחור עדין ולא בולד */
         .projector-btn {
             background-color: white;
             color: var(--delicate-black);
-            border: 1px solid #d1d5db; /* מסגרת אפורה עדינה יותר */
-            padding: 10px 20px;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
             border-radius: 9999px;
-            font-weight: 400; /* לא בולד */
-            font-size: 15px;
+            font-weight: 400;
+            font-size: 14px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             transition: all 0.2s;
         }
-        .projector-btn:hover {
-            background-color: #f9fafb;
-            border-color: #9ca3af;
-            transform: translateY(-1px);
-        }
+        .projector-btn:hover { background-color: #f9fafb; transform: translateY(-1px); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useRef, useMemo } = React;
+        const { useState, useEffect, useCallback, useRef } = React;
 
         const ICONS = ['🧀', '🌾', '🍇', '🍷', '🍯', '🕊️', '🚜', '🧺', '🐮', '🥞'];
 
@@ -146,10 +140,7 @@
 
         const ShavuAsLogo = ({ className = "" }) => (
             <span className={`logo-container ${className}`}>
-                <span>שב</span>
-                <span>ו</span>
-                <span className="shuruk-dot"></span>
-                <span>אס</span>
+                <span>שב</span><span>ו</span><span className="shuruk-dot"></span><span>אס</span>
             </span>
         );
 
@@ -160,31 +151,22 @@
                 const ctx = new AudioContext();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
+                osc.connect(gain); gain.connect(ctx.destination);
                 const now = ctx.currentTime;
                 if (type === 'timer') {
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(150, now);
-                    gain.gain.setValueAtTime(0.15, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-                    osc.start(now);
-                    osc.stop(now + 0.5);
+                    osc.type = 'square'; osc.frequency.setValueAtTime(150, now);
+                    gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now); osc.stop(now + 0.4);
                 } else if (type === 'victory') {
-                    osc.type = 'triangle';
-                    [523.25, 659.25, 783.99, 1046.50].forEach((note, i) => {
-                        osc.frequency.setValueAtTime(note, now + (i * 0.15));
-                    });
-                    gain.gain.setValueAtTime(0.2, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
-                    osc.start(now);
-                    osc.stop(now + 0.8);
+                    osc.type = 'triangle'; [523.25, 659.25, 783.99, 1046.50].forEach((n, i) => osc.frequency.setValueAtTime(n, now + (i * 0.15)));
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                    osc.start(now); osc.stop(now + 0.8);
                 }
             } catch (e) {}
         };
 
-        const SYNC_KEY = 'shavu_as_sync_final_vV6';
-        const channel = new BroadcastChannel('shavu_as_channel_V6');
+        const SYNC_KEY = 'shavu_as_sync_final_vV8';
+        const channel = new BroadcastChannel('shavu_as_channel_V8');
 
         const App = () => {
             const [isProjector] = useState(() => window.location.search.includes('mode=projector'));
@@ -239,8 +221,7 @@
                         });
                     }, 1000);
                 } else if (!isProjector && gameState === 'PLAYING' && !isRobbery && timeLeft === 0) {
-                    playSound('timer');
-                    setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY' });
+                    playSound('timer'); setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY' });
                 }
                 return () => clearInterval(timer);
             }, [gameState, timeLeft, isProjector, isRobbery, broadcast]);
@@ -257,12 +238,9 @@
                 const nextPoints = { ...points };
                 let nextPenalties = penalties;
                 const nextPlayed = playedInTurn + 1;
-                if (id === 'SKIP') nextPenalties++;
-                else nextPoints[id] = (nextPoints[id] || 0) + 1;
-
+                if (id === 'SKIP') nextPenalties++; else nextPoints[id] = (nextPoints[id] || 0) + 1;
                 if (isRobbery && nextPlayed >= 5) {
-                    playSound('timer');
-                    setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY', points: nextPoints, penalties: nextPenalties, playedInTurn: nextPlayed });
+                    playSound('timer'); setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY', points: nextPoints, penalties: nextPenalties, playedInTurn: nextPlayed });
                 } else {
                     const newWords = [...WORDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 8);
                     setPoints(nextPoints); setPenalties(nextPenalties); setPlayedInTurn(nextPlayed); setWords(newWords);
@@ -279,48 +257,40 @@
                 const nextIdx = (activeIdx + 1) % nextTeams.length;
                 setTeams(nextTeams);
                 if (nextTeams.some(t => t.score >= 100)) {
-                    playSound('victory');
-                    setGameState('WINNER'); broadcast({ teams: nextTeams, gameState: 'WINNER' });
+                    playSound('victory'); setGameState('WINNER'); broadcast({ teams: nextTeams, gameState: 'WINNER' });
                 } else {
-                    setActiveIdx(nextIdx); setGameState('BOARD');
-                    broadcast({ teams: nextTeams, gameState: 'BOARD', activeIdx: nextIdx });
+                    setActiveIdx(nextIdx); setGameState('BOARD'); broadcast({ teams: nextTeams, gameState: 'BOARD', activeIdx: nextIdx });
                 }
             };
 
             const Credit = () => (
-                <div className="mt-4 md:mt-8 text-center text-[12px] md:text-[14px] font-bold text-brand-green opacity-90 hover:opacity-100 transition-opacity">
-                    <a href="https://www.pisgah.org.il/" target="_blank" className="hover:underline">
-                        חג שבועות שמח - באהבה פסג"ה חדרה 🌾
-                    </a>
+                <div className="mt-4 text-center text-[12px] md:text-[14px] font-bold text-brand-green opacity-100 hover:opacity-80 transition-opacity">
+                    <a href="https://www.pisgah.org.il/" target="_blank" className="hover:underline">חג שבועות שמח - באהבה פסג"ה חדרה 🌾</a>
                 </div>
             );
 
             if (isProjector) {
                 return (
                     <div className="projector-wrapper p-2 md:p-6">
-                        <div className="max-w-[1200px] mx-auto w-full flex flex-col gap-4">
+                        <div className="max-w-[1200px] mx-auto w-full flex flex-col gap-3">
                             {gameState === 'PLAYING' && (
-                                <div className="mx-auto bg-white border border-green-100 rounded-full py-2 px-10 shadow-sm shrink-0">
+                                <div className="mx-auto bg-white border border-green-100 rounded-full py-2 px-10 shadow-sm">
                                     {isRobbery ? <div className="text-xl md:text-3xl font-bold text-brand-green animate-pulse">🚨 סיבוב גנב! כולם מנחשים 🚨</div> : <div className="text-4xl md:text-6xl font-bold text-brand-green">{timeLeft}</div>}
                                 </div>
                             )}
-                            <div className="bg-white rounded-[2rem] p-4 md:p-8 shadow-sm border border-emerald-50 flex flex-col">
-                                <h2 className="text-2xl md:text-4xl font-bold text-brand-green mb-4 text-center">
+                            <div className="bg-white rounded-[2rem] p-4 md:p-6 shadow-sm border border-emerald-50 flex flex-col">
+                                <h2 className="text-2xl md:text-4xl font-bold text-brand-green mb-3 text-center">
                                     {gameState === 'SETUP' ? <span>ברוכים הבאים ל<ShavuAsLogo />! 🌾</span> : (gameState === 'WINNER' ? 'יש מנצחים! 🏆' : `תור: ${activeTeam.icon} ${activeTeam.name}`)}
                                 </h2>
-                                <div className="board-grid bg-gray-100/50 p-2 md:p-3 rounded-2xl">
+                                <div className="board-grid bg-gray-100/50 p-2 rounded-2xl">
                                     {Array.from({ length: 100 }).map((_, i) => {
                                         const s = i + 1;
                                         const here = teams.filter(t => (gameState === 'SUMMARY' ? Math.max(1, t.score + (points[t.id] || 0) - (t.id === activeTeam.id ? penalties : 0)) : t.score) === s);
                                         return (
-                                            <div key={s} className={`border border-white/60 rounded flex items-center justify-center relative min-h-[7vmin] md:min-h-[6vmin] ${s % 8 === 0 ? 'thief-space' : 'bg-white'}`}>
-                                                <span className="absolute top-0.5 right-1 text-[2.2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
+                                            <div key={s} className={`border border-white/60 rounded flex items-center justify-center relative min-h-[6.5vmin] ${s % 8 === 0 ? 'thief-space' : 'bg-white'}`}>
+                                                <span className="absolute top-0.5 right-1 text-[2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
                                                 <div className="flex flex-wrap justify-center items-center">
-                                                    {here.length > 0 ? (
-                                                        here.map(t => <span key={t.id} className="text-[5.5vmin] drop-shadow-md transition-all">{t.icon}</span>)
-                                                    ) : (
-                                                        s === 100 ? <span className="text-[4vmin] opacity-10 text-brand-green">🏆</span> : null
-                                                    )}
+                                                    {here.length > 0 ? here.map(t => <span key={t.id} className="text-[5vmin] drop-shadow-md">{t.icon}</span>) : (s === 100 ? <span className="text-[4vmin] opacity-10 text-brand-green">🏆</span> : null)}
                                                 </div>
                                             </div>
                                         );
@@ -341,37 +311,24 @@
                                 <h2 className="text-2xl font-bold text-brand-green mb-4 border-b pb-2">איך משחקים ב<ShavuAsLogo />?</h2>
                                 <div className="space-y-4 text-gray-600 text-sm">
                                     <section className="bg-green-50 p-3 rounded-xl border border-green-100">
-                                        <p className="font-bold text-brand-green mb-1">📽️ ניהול בכיתה (מורה):</p>
-                                        <p>1. הקרינו את "מסך המקרן" על הלוח הגדול.</p>
-                                        <p>2. השאירו את הכרטיסים אצלכם (במחשב או בנייד) - אל תפנו לכיתה!</p>
+                                        <p className="font-bold text-brand-green mb-1">📽️ ניהול בכיתה:</p>
+                                        <p>הקרינו את "מסך המקרן" על הלוח והשאירו את הכרטיסים אצלכם (אל תפנו לכיתה).</p>
                                     </section>
-                                    <section className="bg-yellow-50 p-3 rounded-xl border border-yellow-100">
-                                        <p className="font-bold text-yellow-800 mb-1">📱 משחק קבוצתי בנייד:</p>
-                                        <p>ניתן לשחק בקבוצה קטנה ללא מקרן. פשוט העבירו את הטלפון ממגדיר למגדיר בכל פעם שמתחלף תור.</p>
-                                    </section>
-                                    <section className="border-t pt-3">
-                                        <p className="font-bold">כללי המשחק:</p>
-                                        <p>• מסבירים את המילה בלי להגיד אותה או את שורשה.</p>
-                                        <p>• משבצת ירוקה כהה = "גנב". כולם מנחשים יחד ואין טיימר.</p>
-                                    </section>
+                                    <p>• מסבירים את המילה בלי להגיד אותה או את שורשה.</p>
+                                    <p>• משבצת ירוקה = "גנב". כולם מנחשים יחד.</p>
                                 </div>
-                                <button onClick={() => setShowInstructions(false)} className="w-full mt-6 bg-brand-green text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition-all">הבנתי!</button>
+                                <button onClick={() => setShowInstructions(false)} className="w-full mt-6 bg-brand-green text-white font-bold py-3 rounded-xl shadow-lg">הבנתי!</button>
                             </div>
                         </div>
                     )}
 
-                    <button 
-                        onClick={() => window.open(window.location.href.split('?')[0] + "?mode=projector", '_blank')} 
-                        className="absolute top-4 left-4 projector-btn"
-                    >
-                        📽️ פתח חלון למקרן
-                    </button>
+                    <button onClick={() => window.open(window.location.href.split('?')[0] + "?mode=projector", '_blank')} className="absolute top-4 left-4 projector-btn">📽️ פתח חלון למקרן</button>
                     
                     {gameState === 'SETUP' && (
-                        <div className="bg-white p-10 rounded-3xl card-shadow max-w-sm w-full border border-green-50 mt-16">
-                            <h1 className="text-5xl font-bold mb-2 tracking-tight"><ShavuAsLogo /></h1>
-                            <button onClick={() => setShowInstructions(true)} className="instruction-link mb-8 block mx-auto">הוראות משחק והנחיות</button>
-                            <div className="space-y-3">
+                        <div className="bg-white p-8 rounded-3xl card-shadow max-w-sm w-full border border-green-50 mt-12">
+                            <h1 className="text-5xl font-bold mb-2"><ShavuAsLogo /></h1>
+                            <button onClick={() => setShowInstructions(true)} className="instruction-link mb-6 block mx-auto">הוראות משחק</button>
+                            <div className="space-y-2">
                                 {teams.map((t, i) => (
                                     <div key={t.id} className="flex items-center gap-2">
                                         <span className="text-xl">{t.icon}</span>
@@ -387,79 +344,70 @@
                     )}
 
                     {gameState === 'BOARD' && (
-                        <div className="max-w-5xl w-full flex flex-col xl:flex-row gap-6 mx-auto mt-16">
+                        <div className="max-w-5xl w-full flex flex-col xl:flex-row gap-4 mx-auto mt-12">
                             <div className="xl:flex-[2.5] bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-emerald-50">
-                                <div className="flex justify-between items-center mb-6">
-                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] font-medium hover:text-brand-green transition-colors">⚙️ הגדרות</button>
+                                <div className="flex justify-between items-center mb-4">
+                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px]">⚙️ הגדרות</button>
                                     <h2 className="text-xl font-bold text-brand-green">מפת המשחק</h2>
                                     <button onClick={() => setShowInstructions(true)} className="instruction-link">הוראות</button>
                                 </div>
-                                <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-2xl h-[400px] md:h-[450px]">
+                                <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-2xl h-[400px]">
                                     {Array.from({ length: 100 }).map((_, i) => (
                                         <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
-                                            <span className="absolute top-0.5 right-1 text-[13px] text-gray-400 font-bold">{(i)%8+1}</span>
-                                            {teams.filter(t => t.score === (i+1)).length > 0 ? (
-                                                teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-lg md:text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)
-                                            ) : (
-                                                i+1 === 100 ? <span className="text-lg md:text-xl opacity-20 text-brand-green">🏆</span> : null
-                                            )}
+                                            <span className="absolute top-0.5 right-1 text-[11px] text-gray-400 font-bold">{(i)%8+1}</span>
+                                            {teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-lg md:text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)}
+                                            {i+1 === 100 && teams.filter(t=>t.score===100).length===0 && <span className="text-lg opacity-20 text-brand-green">🏆</span>}
                                         </div>
                                     ))}
                                 </div>
                                 <Credit />
                             </div>
-                            <div className="xl:flex-1 bg-white p-6 md:p-8 rounded-3xl shadow-sm text-center flex flex-col justify-center border border-emerald-50">
-                                <h3 className="text-3xl font-bold mb-4 text-brand-green">{activeTeam.icon} {activeTeam.name}</h3>
-                                {isRobbery ? <div className="bg-brand-green text-white p-4 rounded-xl mb-6 font-bold animate-pulse">🚨 שוד! 5 קלפים לכולם</div> : <div className="bg-green-50 p-6 rounded-2xl mb-6 border border-green-100 shadow-inner"><p className="text-xs text-gray-400 font-medium uppercase mb-1">המשימה שלכם:</p><span className="text-6xl font-bold text-brand-green">{targetIdx + 1}</span></div>}
-                                <button onClick={startTurn} className="w-full bg-brand-green text-white font-bold text-xl py-6 rounded-2xl shadow-md active:scale-95 transition-all shadow-emerald-100">התחל תור!</button>
+                            <div className="xl:flex-1 bg-white p-6 rounded-3xl shadow-sm text-center flex flex-col justify-center border border-emerald-50">
+                                <h3 className="text-2xl font-bold mb-2">{activeTeam.icon} {activeTeam.name}</h3>
+                                {isRobbery ? <div className="bg-brand-green text-white p-3 rounded-xl mb-4 font-bold animate-pulse text-sm">🚨 שוד! כולם מנחשים</div> : <div className="bg-green-50 p-4 rounded-2xl mb-4 border border-green-100 shadow-inner"><p className="text-[10px] text-gray-400 uppercase mb-1">המילה למשימה:</p><span className="text-5xl font-bold text-brand-green">{targetIdx + 1}</span></div>}
+                                <button onClick={startTurn} className="w-full bg-brand-green text-white font-bold text-lg py-5 rounded-2xl shadow-md active:scale-95 transition-all">התחל תור!</button>
                             </div>
                         </div>
                     )}
 
                     {gameState === 'PLAYING' && (
-                        <div className="max-w-sm w-full mx-auto mt-16">
-                            <div className={`flex justify-between items-center p-4 rounded-2xl bg-white shadow-sm border-b-4 mb-4 ${isRobbery ? 'border-brand-green' : 'border-green-400'}`}>
-                                <span className="font-bold text-lg text-brand-green">{activeTeam.icon} {activeTeam.name}</span>
-                                <span className="text-4xl font-bold text-brand-green">{isRobbery ? '🚨' : timeLeft}</span>
+                        <div className="max-w-sm w-full mx-auto mt-12 flex flex-col h-[calc(100vh-100px)]">
+                            <div className={`flex justify-between items-center p-3 rounded-xl bg-white shadow-sm border-b-4 mb-3 ${isRobbery ? 'border-brand-green' : 'border-green-400'}`}>
+                                <span className="font-bold text-brand-green">{activeTeam.icon} {activeTeam.name}</span>
+                                <span className="text-3xl font-bold text-brand-green">{isRobbery ? '🚨' : timeLeft}</span>
                             </div>
-                            <div className="bg-white rounded-[2rem] p-6 shadow-xl flex flex-col gap-3 border border-emerald-50 text-right">
+                            <div className="bg-white rounded-[1.5rem] p-3 shadow-xl flex flex-col gap-1 border border-emerald-50 text-right overflow-hidden flex-shrink">
                                 {words.map((word, i) => (
-                                    <div key={i} className={`flex items-center p-3 rounded-xl transition-all ${i === targetIdx ? 'bg-brand-green text-white scale-105 shadow-lg font-bold' : 'opacity-20 blur-[0.5px]'}`}>
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4 ${i === targetIdx ? 'bg-white text-brand-green shadow-inner' : 'bg-gray-100'}`}>{i + 1}</div>
-                                        <div className="text-2xl font-semibold tracking-tight leading-tight">{word}</div>
+                                    <div key={i} className={`flex items-center p-2 rounded-lg transition-all ${i === targetIdx ? 'bg-brand-green text-white scale-102 shadow-md font-bold' : 'opacity-20 grayscale scale-95'}`}>
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold ml-3 shrink-0 ${i === targetIdx ? 'bg-white text-brand-green shadow-inner' : 'bg-gray-100'}`}>{i + 1}</div>
+                                        <div className="text-xl tracking-tight leading-tight">{word}</div>
                                     </div>
                                 ))}
                             </div>
-                            <div className="grid grid-cols-2 gap-3 mt-6">
-                                <button onClick={() => handleAnswer('SKIP')} className="bg-white text-rose-400 py-4 rounded-xl font-bold border border-rose-100 text-xs shadow-sm active:scale-95 transition-all">❌ דילוג (-1)</button>
-                                {!isRobbery ? (
-                                    <button onClick={() => handleAnswer(activeTeam.id)} className="bg-brand-green text-white py-4 rounded-xl font-bold text-xl shadow-md active:scale-95 transition-all shadow-emerald-100">✅ נכון!</button>
-                                ) : (
-                                    <div className="col-span-2 grid grid-cols-2 gap-2 mt-2">
-                                        {teams.map(t => <button key={t.id} onClick={() => handleAnswer(t.id)} className="bg-green-50 border border-green-100 text-brand-green py-3 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-all">{t.icon} {t.name}</button>)}
-                                    </div>
-                                )}
+                            <div className="grid grid-cols-2 gap-3 mt-4">
+                                <button onClick={() => handleAnswer('SKIP')} className="bg-white text-rose-400 py-4 rounded-xl font-bold border border-rose-100 text-xs shadow-sm active:scale-95">❌ דילוג (-1)</button>
+                                {!isRobbery ? <button onClick={() => handleAnswer(activeTeam.id)} className="bg-brand-green text-white py-4 rounded-xl font-bold text-xl shadow-md active:scale-95">✅ נכון!</button> : <div className="col-span-2 grid grid-cols-2 gap-2 mt-2">{teams.map(t => <button key={t.id} onClick={() => handleAnswer(t.id)} className="bg-green-50 border border-green-100 text-brand-green py-2 rounded-lg text-xs font-bold shadow-sm">{t.icon} {t.name}</button>)}</div>}
                             </div>
                         </div>
                     )}
 
                     {gameState === 'SUMMARY' && (
-                        <div className="bg-white p-12 rounded-[2.5rem] card-shadow max-w-sm w-full text-center border border-emerald-50 mt-16">
-                            <h2 className="text-3xl font-bold text-brand-green mb-6 tracking-tighter">סיכום התור ⏰</h2>
-                            <div className="bg-gray-50 p-6 rounded-2xl mb-8 space-y-3 text-right font-bold shadow-inner">
-                                {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between"><span>{t.icon} {t.name}</span><span className="text-brand-green">+{points[t.id]}</span></div>) : <div className="flex justify-between text-xl"><span>נכונות:</span><span className="text-brand-green">{points[activeTeam.id] || 0}</span></div>}
+                        <div className="bg-white p-10 rounded-[2rem] card-shadow max-w-sm w-full text-center border border-emerald-50 mt-12">
+                            <h2 className="text-2xl font-bold text-brand-green mb-4">סיכום התור ⏰</h2>
+                            <div className="bg-gray-50 p-5 rounded-2xl mb-6 space-y-2 text-right shadow-inner">
+                                {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between"><span>{t.icon} {t.name}</span><span className="text-brand-green">+{points[t.id]}</span></div>) : <div className="flex justify-between font-bold"><span>נכונות:</span><span className="text-brand-green">{points[activeTeam.id] || 0}</span></div>}
                                 <div className="flex justify-between text-rose-500"><span>דילוגים:</span><span>{penalties}</span></div>
                             </div>
-                            <button onClick={finalize} className="w-full bg-brand-green text-white font-bold text-lg py-5 rounded-xl shadow-lg active:scale-95 transition-all shadow-emerald-100">חזרה למפה 🗺️</button>
+                            <button onClick={finalize} className="w-full bg-brand-green text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95">חזרה למפה 🗺️</button>
                             <Credit />
                         </div>
                     )}
 
                     {gameState === 'WINNER' && (
-                        <div className="text-center bg-white p-12 rounded-[3rem] card-shadow border border-emerald-50 mt-16">
-                            <div className="text-[10rem] mb-4">🏆</div>
-                            <h1 className="text-5xl font-bold text-brand-green mb-8 tracking-tight">יש מנצחים ב<ShavuAsLogo />!</h1>
-                            <button onClick={() => { setTeams(teams.map(t=>({...t,score:1}))); setGameState('SETUP'); broadcast({ teams: teams.map(t=>({...t,score:1})), gameState: 'SETUP' }); }} className="bg-brand-green text-white font-bold py-6 px-16 rounded-full text-2xl shadow-xl active:scale-95 transition-all shadow-emerald-100">משחק חדש 🔄</button>
+                        <div className="text-center bg-white p-10 rounded-[2.5rem] card-shadow border border-emerald-50 mt-12">
+                            <div className="text-[6rem] mb-2">🏆</div>
+                            <h1 className="text-4xl font-bold text-brand-green mb-6">יש מנצחים ב<ShavuAsLogo />!</h1>
+                            <button onClick={() => { setTeams(teams.map(t=>({...t,score:1}))); setGameState('SETUP'); broadcast({ teams: teams.map(t=>({...t,score:1})), gameState: 'SETUP' }); }} className="bg-brand-green text-white font-bold py-5 px-12 rounded-full text-xl shadow-xl active:scale-95">משחק חדש 🔄</button>
                             <Credit />
                         </div>
                     )}

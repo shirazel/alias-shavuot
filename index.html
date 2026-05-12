@@ -86,7 +86,7 @@
             "מגילה", "קציר חיטים", "מחרשה", "אפייה", "קמח", "בצק", "שמרים", "פחמימות"
         ];
 
-        // מנגנון יצירת צלילים
+        // מנגנון צלילים
         const playSound = (type) => {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -94,39 +94,33 @@
                 const ctx = new AudioContext();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-                
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                
                 const now = ctx.currentTime;
 
                 if (type === 'timer') {
-                    // צליל סיום זמן - באזר נמוך
                     osc.type = 'square';
                     osc.frequency.setValueAtTime(150, now);
-                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.setValueAtTime(0.15, now);
                     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
                     osc.start(now);
                     osc.stop(now + 0.5);
                 } else if (type === 'victory') {
-                    // צליל ניצחון - תרועה עולה
                     osc.type = 'triangle';
-                    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
                     notes.forEach((note, i) => {
                         osc.frequency.setValueAtTime(note, now + (i * 0.15));
                     });
-                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.setValueAtTime(0.2, now);
                     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
                     osc.start(now);
                     osc.stop(now + 0.8);
                 }
-            } catch (e) {
-                console.log("Audio play failed", e);
-            }
+            } catch (e) {}
         };
 
-        const SYNC_KEY = 'alias_shavuot_sync_v16';
-        const channel = new BroadcastChannel('shavuot_channel_v16');
+        const SYNC_KEY = 'alias_shavuot_sync_v17';
+        const channel = new BroadcastChannel('shavuot_channel_v17');
 
         const App = () => {
             const [isProjector] = useState(() => window.location.search.includes('mode=projector'));
@@ -159,7 +153,6 @@
                     if (!s) return;
                     if (s.gameState === 'SUMMARY' && gameState === 'PLAYING') playSound('timer');
                     if (s.gameState === 'WINNER' && gameState !== 'WINNER') playSound('victory');
-                    
                     setGameState(s.gameState); setTeams(s.teams); setActiveIdx(s.activeIdx);
                     setTimeLeft(s.timeLeft); setWords(s.words);
                     setPoints(s.points); setPenalties(s.penalties); setPlayedInTurn(s.playedInTurn);
@@ -200,7 +193,6 @@
                 const nextPoints = { ...points };
                 let nextPenalties = penalties;
                 const nextPlayed = playedInTurn + 1;
-
                 if (id === 'SKIP') nextPenalties++;
                 else nextPoints[id] = (nextPoints[id] || 0) + 1;
 
@@ -250,12 +242,13 @@
                                         const here = teams.filter(t => (gameState === 'SUMMARY' ? Math.max(1, t.score + (points[t.id] || 0) - (t.id === activeTeam.id ? penalties : 0)) : t.score) === s);
                                         return (
                                             <div key={s} className={`border rounded flex items-center justify-center relative ${s % 8 === 0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
-                                                <span className="absolute top-0.5 right-1 text-[1vmin] text-gray-300 font-bold">{(s-1)%8+1}</span>
+                                                {/* מספרים מוגדלים למקרן */}
+                                                <span className="absolute top-1 right-1 text-[2.2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
                                                 <div className="flex flex-wrap justify-center items-center h-full w-full">
                                                     {here.length > 0 ? (
-                                                        here.map(t => <span key={t.id} className="text-[4vmin] drop-shadow-sm">{t.icon}</span>)
+                                                        here.map(t => <span key={t.id} className="text-[5.5vmin] drop-shadow-md">{t.icon}</span>)
                                                     ) : (
-                                                        s === 100 ? <span className="text-[3vmin] opacity-20">🏆</span> : null
+                                                        s === 100 ? <span className="text-[4vmin] opacity-10">🏆</span> : null
                                                     )}
                                                 </div>
                                             </div>
@@ -316,7 +309,8 @@
                                 <div className="board-grid bg-gray-50 p-2 rounded-2xl h-[450px]">
                                     {Array.from({ length: 100 }).map((_, i) => (
                                         <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
-                                            <span className="absolute top-0.5 right-1 text-[10px] text-gray-300 font-bold">{(i)%8+1}</span>
+                                            {/* מספרים מוגדלים למורה */}
+                                            <span className="absolute top-0.5 right-1 text-[13px] text-gray-400 font-bold">{(i)%8+1}</span>
                                             {teams.filter(t => t.score === (i+1)).length > 0 ? (
                                                 teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)
                                             ) : (
@@ -343,7 +337,7 @@
                             <div className="bg-white rounded-[2rem] p-6 shadow-xl flex flex-col gap-3 border border-emerald-50">
                                 {words.map((word, i) => (
                                     <div key={i} className={`flex items-center p-3 rounded-xl transition-all ${i === targetIdx ? 'bg-emerald-500 text-white scale-105 shadow-lg font-bold' : 'opacity-20 blur-[0.5px]'}`}>
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4 ${i === targetIdx ? 'bg-white text-emerald-600' : 'bg-gray-100'}`}>{i + 1}</div>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4 ${i === targetIdx ? 'bg-white text-emerald-600 shadow-inner' : 'bg-gray-100'}`}>{i + 1}</div>
                                         <div className="text-2xl font-semibold tracking-tight">{word}</div>
                                     </div>
                                 ))}

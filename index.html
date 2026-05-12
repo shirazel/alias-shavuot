@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap');
         
         body {
             font-family: 'Assistant', sans-serif;
@@ -45,7 +45,6 @@
             z-index: 1000;
         }
 
-        /* עיצוב קישור הוראות עדין וקטן כפי שביקשת */
         .instruction-link {
             color: #10b981;
             font-size: 13px;
@@ -87,8 +86,47 @@
             "מגילה", "קציר חיטים", "מחרשה", "אפייה", "קמח", "בצק", "שמרים", "פחמימות"
         ];
 
-        const SYNC_KEY = 'alias_shavuot_sync_vFinal';
-        const channel = new BroadcastChannel('shavuot_channel_final');
+        // מנגנון יצירת צלילים
+        const playSound = (type) => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                const now = ctx.currentTime;
+
+                if (type === 'timer') {
+                    // צליל סיום זמן - באזר נמוך
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, now);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else if (type === 'victory') {
+                    // צליל ניצחון - תרועה עולה
+                    osc.type = 'triangle';
+                    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                    notes.forEach((note, i) => {
+                        osc.frequency.setValueAtTime(note, now + (i * 0.15));
+                    });
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                    osc.start(now);
+                    osc.stop(now + 0.8);
+                }
+            } catch (e) {
+                console.log("Audio play failed", e);
+            }
+        };
+
+        const SYNC_KEY = 'alias_shavuot_sync_v16';
+        const channel = new BroadcastChannel('shavuot_channel_v16');
 
         const App = () => {
             const [isProjector] = useState(() => window.location.search.includes('mode=projector'));
@@ -98,45 +136,41 @@
                 { id: 1, name: 'קבוצה 1', icon: ICONS[0], score: 1 }, 
                 { id: 2, name: 'קבוצה 2', icon: ICONS[1], score: 1 }
             ]);
-            const [activeTeamIdx, setActiveTeamIdx] = useState(0);
+            const [activeIdx, setActiveIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(60);
-            const [currentWords, setCurrentWords] = useState([]);
+            const [words, setWords] = useState([]);
             const [points, setPoints] = useState({});
             const [penalties, setPenalties] = useState(0);
-            const [cardsCount, setCardsCount] = useState(0);
+            const [playedInTurn, setPlayedInTurn] = useState(0);
 
-            const activeTeam = teams[activeTeamIdx] || teams[0];
+            const activeTeam = teams[activeIdx] || teams[0];
             const targetIdx = (activeTeam.score - 1) % 8;
             const isRobbery = activeTeam.score % 8 === 0;
 
-            // שידור מצב לכל החלונות
             const broadcast = useCallback((data) => {
                 if (isProjector) return;
-                const state = {
-                    gameState, teams, activeTeamIdx, timeLeft, currentWords, 
-                    points, penalties, cardsCount, ...data
-                };
+                const state = { gameState, teams, activeIdx, timeLeft, words, points, penalties, playedInTurn, ...data };
                 channel.postMessage(state);
                 localStorage.setItem(SYNC_KEY, JSON.stringify(state));
-            }, [isProjector, gameState, teams, activeTeamIdx, timeLeft, currentWords, points, penalties, cardsCount]);
+            }, [isProjector, gameState, teams, activeIdx, timeLeft, words, points, penalties, playedInTurn]);
 
-            // קבלת עדכונים
             useEffect(() => {
                 const handleSync = (s) => {
                     if (!s) return;
-                    setGameState(s.gameState); setTeams(s.teams); setActiveTeamIdx(s.activeTeamIdx);
-                    setTimeLeft(s.timeLeft); setCurrentWords(s.currentWords);
-                    setPoints(s.points); setPenalties(s.penalties); setCardsCount(s.cardsCount);
+                    if (s.gameState === 'SUMMARY' && gameState === 'PLAYING') playSound('timer');
+                    if (s.gameState === 'WINNER' && gameState !== 'WINNER') playSound('victory');
+                    
+                    setGameState(s.gameState); setTeams(s.teams); setActiveIdx(s.activeIdx);
+                    setTimeLeft(s.timeLeft); setWords(s.words);
+                    setPoints(s.points); setPenalties(s.penalties); setPlayedInTurn(s.playedInTurn);
                 };
                 channel.onmessage = (e) => handleSync(e.data);
-                window.onstorage = (e) => { if (e.key === SYNC_KEY) handleSync(JSON.parse(e.newValue)); };
                 if (isProjector) {
                     const saved = localStorage.getItem(SYNC_KEY);
                     if (saved) handleSync(JSON.parse(saved));
                 }
-            }, [isProjector]);
+            }, [isProjector, gameState]);
 
-            // טיימר
             useEffect(() => {
                 let timer;
                 if (!isProjector && gameState === 'PLAYING' && !isRobbery && timeLeft > 0) {
@@ -148,49 +182,52 @@
                         });
                     }, 1000);
                 } else if (!isProjector && gameState === 'PLAYING' && !isRobbery && timeLeft === 0) {
+                    playSound('timer');
                     setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY' });
                 }
                 return () => clearInterval(timer);
             }, [gameState, timeLeft, isProjector, isRobbery, broadcast]);
 
             const startTurn = () => {
-                const initialPoints = {};
-                teams.forEach(t => initialPoints[t.id] = 0);
-                const words = [...WORDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 8);
-                setGameState('PLAYING'); setTimeLeft(60); setPoints(initialPoints); setPenalties(0); setCardsCount(0); setCurrentWords(words);
-                broadcast({ gameState: 'PLAYING', timeLeft: 60, points: initialPoints, penalties: 0, cardsCount: 0, currentWords: words });
+                const initPoints = {}; teams.forEach(t => initPoints[t.id] = 0);
+                const newWords = [...WORDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 8);
+                const up = { gameState: 'PLAYING', timeLeft: 60, points: initPoints, penalties: 0, playedInTurn: 0, words: newWords };
+                setGameState('PLAYING'); setTimeLeft(60); setPoints(initPoints); setPenalties(0); setPlayedInTurn(0); setWords(newWords);
+                broadcast(up);
             };
 
             const handleAnswer = (id) => {
                 const nextPoints = { ...points };
                 let nextPenalties = penalties;
-                const nextCount = cardsCount + 1;
+                const nextPlayed = playedInTurn + 1;
+
                 if (id === 'SKIP') nextPenalties++;
                 else nextPoints[id] = (nextPoints[id] || 0) + 1;
 
-                if (isRobbery && nextCount >= 5) {
-                    setGameState('SUMMARY');
-                    broadcast({ gameState: 'SUMMARY', points: nextPoints, penalties: nextPenalties, cardsCount: nextCount });
+                if (isRobbery && nextPlayed >= 5) {
+                    playSound('timer');
+                    setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY', points: nextPoints, penalties: nextPenalties, playedInTurn: nextPlayed });
                 } else {
-                    const words = [...WORDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 8);
-                    setPoints(nextPoints); setPenalties(nextPenalties); setCardsCount(nextCount); setCurrentWords(words);
-                    broadcast({ points: nextPoints, penalties: nextPenalties, cardsCount: nextCount, currentWords: words });
+                    const newWords = [...WORDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 8);
+                    setPoints(nextPoints); setPenalties(nextPenalties); setPlayedInTurn(nextPlayed); setWords(newWords);
+                    broadcast({ points: nextPoints, penalties: nextPenalties, playedInTurn: nextPlayed, words: newWords });
                 }
             };
 
-            const finalizeTurn = () => {
+            const finalize = () => {
                 const nextTeams = teams.map(t => {
                     const p = points[t.id] || 0;
                     const pen = t.id === activeTeam.id ? penalties : 0;
-                    return { ...t, score: Math.max(1, t.score + p - pen) };
+                    return { ...t, score: Math.min(100, Math.max(1, t.score + p - pen)) };
                 });
-                const nextIdx = (activeTeamIdx + 1) % nextTeams.length;
+                const nextIdx = (activeIdx + 1) % nextTeams.length;
                 setTeams(nextTeams);
                 if (nextTeams.some(t => t.score >= 100)) {
+                    playSound('victory');
                     setGameState('WINNER'); broadcast({ teams: nextTeams, gameState: 'WINNER' });
                 } else {
-                    setActiveTeamIdx(nextIdx); setGameState('BOARD');
-                    broadcast({ teams: nextTeams, gameState: 'BOARD', activeTeamIdx: nextIdx });
+                    setActiveIdx(nextIdx); setGameState('BOARD');
+                    broadcast({ teams: nextTeams, gameState: 'BOARD', activeIdx: nextIdx });
                 }
             };
 
@@ -200,7 +237,7 @@
                         <div className="flex flex-col h-full gap-4">
                             {gameState === 'PLAYING' && (
                                 <div className="mx-auto bg-white border border-emerald-100 rounded-full py-4 px-12 shadow-sm">
-                                    {isRobbery ? <div className="text-3xl font-medium text-emerald-600 animate-pulse">🚨 סיבוב גנב! כולם מנחשים 🚨</div> : <div className="text-6xl font-bold text-emerald-800">{timeLeft}</div>}
+                                    {isRobbery ? <div className="text-3xl font-bold text-emerald-600 animate-pulse">🚨 סיבוב גנב! כולם מנחשים 🚨</div> : <div className="text-6xl font-bold text-emerald-800">{timeLeft}</div>}
                                 </div>
                             )}
                             <div className="flex-grow bg-white rounded-[2rem] p-6 shadow-sm border border-emerald-50 flex flex-col">
@@ -212,9 +249,15 @@
                                         const s = i + 1;
                                         const here = teams.filter(t => (gameState === 'SUMMARY' ? Math.max(1, t.score + (points[t.id] || 0) - (t.id === activeTeam.id ? penalties : 0)) : t.score) === s);
                                         return (
-                                            <div key={s} className={`border rounded flex items-center justify-center relative ${s % 8 === 0 ? 'thief-space' : 'bg-white'}`}>
-                                                <span className="absolute top-0.5 right-1 text-[1vmin] text-gray-300">{(s-1)%8+1}</span>
-                                                <div className="flex flex-wrap justify-center">{here.map(t => <span key={t.id} className="text-[4vmin]">{t.icon}</span>)}</div>
+                                            <div key={s} className={`border rounded flex items-center justify-center relative ${s % 8 === 0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
+                                                <span className="absolute top-0.5 right-1 text-[1vmin] text-gray-300 font-bold">{(s-1)%8+1}</span>
+                                                <div className="flex flex-wrap justify-center items-center h-full w-full">
+                                                    {here.length > 0 ? (
+                                                        here.map(t => <span key={t.id} className="text-[4vmin] drop-shadow-sm">{t.icon}</span>)
+                                                    ) : (
+                                                        s === 100 ? <span className="text-[3vmin] opacity-20">🏆</span> : null
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -266,22 +309,27 @@
                         <div className="max-w-5xl w-full flex flex-col xl:flex-row gap-6">
                             <div className="xl:flex-[2.5] bg-white rounded-3xl p-6 shadow-sm border border-emerald-50">
                                 <div className="flex justify-between items-center mb-6">
-                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] hover:text-emerald-500">⚙️ הגדרות</button>
+                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] font-medium">⚙️ הגדרות</button>
                                     <h2 className="text-xl font-bold text-emerald-800">מפת המשחק</h2>
                                     <button onClick={() => setShowInstructions(true)} className="instruction-link">הוראות</button>
                                 </div>
                                 <div className="board-grid bg-gray-50 p-2 rounded-2xl h-[450px]">
                                     {Array.from({ length: 100 }).map((_, i) => (
-                                        <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white'}`}>
-                                            {teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)}
+                                        <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
+                                            <span className="absolute top-0.5 right-1 text-[10px] text-gray-300 font-bold">{(i)%8+1}</span>
+                                            {teams.filter(t => t.score === (i+1)).length > 0 ? (
+                                                teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)
+                                            ) : (
+                                                i+1 === 100 ? <span className="text-xl opacity-20">🏆</span> : null
+                                            )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                             <div className="xl:flex-1 bg-white p-8 rounded-3xl shadow-sm text-center flex flex-col justify-center border border-emerald-50">
-                                <h3 className="text-3xl font-bold mb-4">{activeTeam.icon} {activeTeam.name}</h3>
-                                {isRobbery ? <div className="bg-emerald-600 text-white p-4 rounded-xl mb-6 font-bold animate-pulse">🚨 שוד! 5 קלפים לכולם</div> : <div className="bg-emerald-50 p-6 rounded-2xl mb-6 border border-emerald-100 shadow-inner"><p className="text-xs text-gray-500 uppercase">המשימה שלכם:</p><span className="text-6xl font-bold text-emerald-600">{targetIdx + 1}</span></div>}
-                                <button onClick={startTurn} className="w-full bg-emerald-500 text-white font-bold text-xl py-6 rounded-2xl shadow-md active:scale-95">התחל תור!</button>
+                                <h3 className="text-3xl font-bold mb-4 text-emerald-900">{activeTeam.icon} {activeTeam.name}</h3>
+                                {isRobbery ? <div className="bg-emerald-600 text-white p-4 rounded-xl mb-6 font-bold animate-pulse">🚨 שוד! 5 קלפים לכולם</div> : <div className="bg-emerald-50 p-6 rounded-2xl mb-6 border border-emerald-100 shadow-inner"><p className="text-xs text-gray-400 font-medium uppercase mb-1">המשימה שלכם:</p><span className="text-6xl font-bold text-emerald-600">{targetIdx + 1}</span></div>}
+                                <button onClick={startTurn} className="w-full bg-emerald-500 text-white font-bold text-xl py-6 rounded-2xl shadow-md active:scale-95 transition-all">התחל תור!</button>
                             </div>
                         </div>
                     )}
@@ -292,8 +340,8 @@
                                 <span className="font-bold text-lg">{activeTeam.icon} {activeTeam.name}</span>
                                 <span className="text-4xl font-bold text-emerald-800">{isRobbery ? '🚨' : timeLeft}</span>
                             </div>
-                            <div className="bg-white rounded-[2rem] p-6 shadow-xl flex flex-col gap-3">
-                                {currentWords.map((word, i) => (
+                            <div className="bg-white rounded-[2rem] p-6 shadow-xl flex flex-col gap-3 border border-emerald-50">
+                                {words.map((word, i) => (
                                     <div key={i} className={`flex items-center p-3 rounded-xl transition-all ${i === targetIdx ? 'bg-emerald-500 text-white scale-105 shadow-lg font-bold' : 'opacity-20 blur-[0.5px]'}`}>
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4 ${i === targetIdx ? 'bg-white text-emerald-600' : 'bg-gray-100'}`}>{i + 1}</div>
                                         <div className="text-2xl font-semibold tracking-tight">{word}</div>
@@ -301,12 +349,12 @@
                                 ))}
                             </div>
                             <div className="grid grid-cols-2 gap-3 mt-6">
-                                <button onClick={() => handleAnswer('SKIP')} className="bg-white text-rose-400 py-4 rounded-xl font-bold border border-rose-100 text-xs">❌ דילוג (-1)</button>
+                                <button onClick={() => handleAnswer('SKIP')} className="bg-white text-rose-400 py-4 rounded-xl font-bold border border-rose-100 text-xs shadow-sm active:scale-95 transition-all">❌ דילוג (-1)</button>
                                 {!isRobbery ? (
-                                    <button onClick={() => handleAnswer(activeTeam.id)} className="bg-emerald-500 text-white py-4 rounded-xl font-bold text-xl shadow-md">✅ נכון!</button>
+                                    <button onClick={() => handleAnswer(activeTeam.id)} className="bg-emerald-500 text-white py-4 rounded-xl font-bold text-xl shadow-md active:scale-95 transition-all">✅ נכון!</button>
                                 ) : (
                                     <div className="col-span-2 grid grid-cols-2 gap-2 mt-2">
-                                        {teams.map(t => <button key={t.id} onClick={() => handleAnswer(t.id)} className="bg-emerald-50 border border-emerald-100 text-emerald-700 py-3 rounded-lg text-xs font-bold shadow-sm">{t.icon} {t.name}</button>)}
+                                        {teams.map(t => <button key={t.id} onClick={() => handleAnswer(t.id)} className="bg-emerald-50 border border-emerald-100 text-emerald-700 py-3 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-all">{t.icon} {t.name}</button>)}
                                     </div>
                                 )}
                             </div>
@@ -317,17 +365,17 @@
                         <div className="bg-white p-12 rounded-[2.5rem] card-shadow max-w-sm w-full text-center border border-emerald-50">
                             <h2 className="text-3xl font-bold text-emerald-800 mb-6 tracking-tighter">סיכום התור ⏰</h2>
                             <div className="bg-gray-50 p-6 rounded-2xl mb-8 space-y-3 text-right font-bold shadow-inner">
-                                {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between"><span>{t.icon} {t.name}</span><span className="text-emerald-600">+{points[t.id]}</span></div>) : <div className="flex justify-between text-xl"><span>נכונות:</span><span className="text-emerald-600">{points[activeTeam.id] || 0}</span></div>}
+                                {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between"><span>{t.icon} {t.name}</span><span className="text-emerald-600 bg-white px-3 py-0.5 rounded-full border border-emerald-50">+{points[t.id]}</span></div>) : <div className="flex justify-between text-xl"><span>נכונות:</span><span className="text-emerald-600 bg-white px-3 py-0.5 rounded-full border border-emerald-50">{points[activeTeam.id] || 0}</span></div>}
                                 <div className="flex justify-between text-rose-500"><span>דילוגים:</span><span>{penalties}</span></div>
                             </div>
-                            <button onClick={finalizeTurn} className="w-full bg-emerald-500 text-white font-bold text-lg py-5 rounded-xl shadow-lg active:scale-95 shadow-emerald-100">חזרה למפה 🗺️</button>
+                            <button onClick={finalize} className="w-full bg-emerald-500 text-white font-bold text-lg py-5 rounded-xl shadow-lg active:scale-95 transition-all shadow-emerald-100">חזרה למפה 🗺️</button>
                         </div>
                     )}
 
                     {gameState === 'WINNER' && (
                         <div className="text-center bg-white p-12 rounded-[3rem] card-shadow border border-emerald-50">
                             <h1 className="text-5xl font-bold text-emerald-800 mb-8">יש מנצחים! 🏆</h1>
-                            <button onClick={() => { setTeams(teams.map(t=>({...t,score:1}))); setGameState('SETUP'); broadcast({ teams: teams.map(t=>({...t,score:1})), gameState: 'SETUP' }); }} className="bg-emerald-600 text-white font-bold py-6 px-16 rounded-full text-2xl shadow-xl active:scale-95">משחק חדש 🔄</button>
+                            <button onClick={() => { setTeams(teams.map(t=>({...t,score:1}))); setGameState('SETUP'); broadcast({ teams: teams.map(t=>({...t,score:1})), gameState: 'SETUP' }); }} className="bg-emerald-600 text-white font-bold py-6 px-16 rounded-full text-2xl shadow-xl active:scale-95 transition-all">משחק חדש 🔄</button>
                         </div>
                     )}
                 </div>

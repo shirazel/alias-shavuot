@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>שבוּאס - פסג"ה חדרה</title>
+    <title>שבוּעס - פסג"ה חדרה</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -40,10 +40,17 @@
         .text-brand-green { color: var(--brand-green) !important; }
         .border-brand-green { border-color: var(--brand-green) !important; }
 
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+
+        /* מניעת מריחה! הלוח יהיה ריבוע מושלם תמיד */
         .board-grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
             grid-template-rows: repeat(10, 1fr);
+            aspect-ratio: 1 / 1; 
+            margin: 0 auto;
         }
         
         .thief-space {
@@ -135,32 +142,6 @@
             background-color: var(--brand-green);
             opacity: 0.8;
         }
-
-        @media (max-width: 768px) {
-            .projector-btn { display: none !important; }
-        }
-
-        /* סגנון כפתור הגדרות מרחף */
-        .settings-btn-floating {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background-color: white;
-            color: #9ca3af;
-            border: 1px solid #e5e7eb;
-            padding: 0.5rem 1rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-            transition: all 0.2s;
-            z-index: 50;
-        }
-        .settings-btn-floating:hover {
-            color: var(--brand-green);
-            border-color: var(--brand-green);
-            background-color: #f0fdf4;
-        }
     </style>
 </head>
 <body>
@@ -183,9 +164,10 @@
             "מגילה", "קציר חיטים", "מחרשה", "אפייה", "קמח", "בצק", "שמרים", "פחמימות"
         ];
 
+        // לוגו עם השם "שבועס"
         const ShavuAsLogo = ({ className = "" }) => (
             <span className={`logo-container ${className}`}>
-                <span>שב</span><span>ו</span><span className="shuruk-dot"></span><span>אס</span>
+                <span>שב</span><span>ו</span><span className="shuruk-dot"></span><span>עס</span>
             </span>
         );
 
@@ -236,8 +218,8 @@
             } catch (e) {}
         };
 
-        const SYNC_KEY = 'shavu_as_sync_final_v16';
-        const channel = new BroadcastChannel('shavu_as_channel_v16');
+        const SYNC_KEY = 'shavu_as_sync_final_v19';
+        const channel = new BroadcastChannel('shavu_as_channel_v19');
 
         const App = () => {
             const [isProjector] = useState(() => window.location.search.includes('mode=projector'));
@@ -259,8 +241,6 @@
             const activeTeam = teams[activeIdx] || teams[0];
             const targetIdx = (activeTeam.score - 1) % 8;
             const isRobbery = activeTeam.score % 8 === 0;
-            
-            // בדיקה האם לא נצברו נקודות בכלל במשחק (כל הקבוצות על 1)
             const isNoPoints = teams.every(t => t.score <= 1);
 
             const broadcast = useCallback((data) => {
@@ -315,8 +295,10 @@
                 let nextPenalties = penalties;
                 const nextPlayed = playedInTurn + 1;
                 if (id === 'SKIP') nextPenalties++; else nextPoints[id] = (nextPoints[id] || 0) + 1;
+
                 if (isRobbery && nextPlayed >= 5) {
-                    playSound('timer'); setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY', points: nextPoints, penalties: nextPenalties, playedInTurn: nextPlayed });
+                    playSound('timer');
+                    setGameState('SUMMARY'); broadcast({ gameState: 'SUMMARY', points: nextPoints, penalties: nextPenalties, playedInTurn: nextPlayed });
                 } else {
                     const newWords = [...WORDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 8);
                     setPoints(nextPoints); setPenalties(nextPenalties); setPlayedInTurn(nextPlayed); setWords(newWords);
@@ -333,7 +315,8 @@
                 const nextIdx = (activeIdx + 1) % nextTeams.length;
                 setTeams(nextTeams);
                 if (nextTeams.some(t => t.score >= 100)) {
-                    playSound('victory'); setGameState('WINNER'); broadcast({ teams: nextTeams, gameState: 'WINNER' });
+                    playSound('victory');
+                    setGameState('WINNER'); broadcast({ teams: nextTeams, gameState: 'WINNER' });
                 } else {
                     setActiveIdx(nextIdx); setGameState('BOARD'); broadcast({ teams: nextTeams, gameState: 'BOARD', activeIdx: nextIdx });
                 }
@@ -348,48 +331,46 @@
                 setTeams(resetTeams); setGameState('SETUP'); setActiveIdx(0); setRoundDuration(60);
                 broadcast({ teams: resetTeams, gameState: 'SETUP', activeIdx: 0, roundDuration: 60 });
             };
-            
-            const goToSetup = () => {
-                setGameState('SETUP');
-                broadcast({ gameState: 'SETUP' });
-            };
 
             const Credit = () => (
                 <div className="mt-4 text-center text-[12px] md:text-[14px] font-bold text-brand-green opacity-100 hover:opacity-80 transition-opacity">
                     <a href="https://www.pisgah.org.il/" target="_blank" className="hover:underline">חג שבועות שמח - באהבה פסג"ה חדרה 🌾</a>
                 </div>
             );
-            
-            const SettingsButton = () => (
-                <button onClick={goToSetup} className="settings-btn-floating">⚙️ הגדרות</button>
-            );
 
             if (isProjector) {
                 return (
-                    <div className="projector-wrapper p-2 md:p-6">
-                        <div className="max-w-[1200px] mx-auto w-full flex flex-col gap-3">
+                    <div className="h-screen overflow-hidden flex flex-col p-2 md:p-6 bg-gray-50 text-center">
+                        <div className="flex flex-col h-full gap-2 md:gap-4 max-w-[1000px] mx-auto w-full">
                             {gameState === 'PLAYING' && (
                                 <div className="mx-auto bg-white border border-green-100 rounded-full py-2 px-10 shadow-sm shrink-0">
                                     {isRobbery ? <div className="text-xl md:text-3xl font-bold text-brand-green animate-pulse"><SickleIcon className="w-8 h-8 inline-block ml-2 mb-1" /> סיבוב הקוצר! כולם מנחשים <SickleIcon className="w-8 h-8 inline-block mr-2 mb-1 transform scale-x-[-1]" /></div> : <div className="text-4xl md:text-6xl font-bold text-brand-green">{timeLeft}</div>}
                                 </div>
                             )}
-                            <div className="bg-white rounded-[2rem] p-4 md:p-6 shadow-sm border border-emerald-50 flex flex-col">
-                                <h2 className="text-2xl md:text-4xl font-bold text-brand-green mb-3 text-center flex items-center justify-center gap-3">
-                                    {gameState === 'SETUP' ? <span>ברוכים הבאים ל<ShavuAsLogo />! 🌾</span> : (gameState === 'WINNER' ? <span className="flex items-center gap-3">תוצאות סופיות! <BikkurimBasket className="w-10 h-10 inline" /></span> : `תור: ${activeTeam.icon} ${activeTeam.name}`)}
+                            <div className="flex-grow bg-white rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-6 shadow-sm border border-emerald-50 flex flex-col min-h-0">
+                                <h2 className="text-xl md:text-3xl font-bold text-brand-green mb-2 md:mb-4">
+                                    {gameState === 'SETUP' ? <span>ברוכים הבאים ל<ShavuAsLogo />! 🌾</span> : (gameState === 'WINNER' ? <span className="flex items-center justify-center gap-3">תוצאות סופיות! <BikkurimBasket className="w-8 h-8 inline" /></span> : `תור: ${activeTeam.icon} ${activeTeam.name}`)}
                                 </h2>
-                                <div className="board-grid bg-gray-100/50 p-2 rounded-2xl">
-                                    {Array.from({ length: 100 }).map((_, i) => {
-                                        const s = i + 1;
-                                        const here = teams.filter(t => (gameState === 'SUMMARY' ? Math.max(1, t.score + (points[t.id] || 0) - (t.id === activeTeam.id ? penalties : 0)) : t.score) === s);
-                                        return (
-                                            <div key={s} className={`border border-white/60 rounded flex items-center justify-center relative min-h-[6.5vmin] ${s % 8 === 0 ? 'thief-space' : 'bg-white'}`}>
-                                                <span className="absolute top-0.5 right-1 text-[2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
-                                                <div className="flex flex-wrap justify-center items-center">
-                                                    {here.length > 0 ? here.map(t => <span key={t.id} className="text-[5.5vmin] drop-shadow-md">{t.icon}</span>) : (s === 100 ? <BikkurimBasket className="w-[5vmin] h-[5vmin] opacity-30" /> : null)}
+                                {/* חסם למקרן - יחס 1:1, מונע מתיחה למלבנים */}
+                                <div className="w-full flex-grow flex items-center justify-center min-h-0">
+                                    <div className="board-grid bg-gray-100/50 p-2 rounded-2xl h-full w-full max-w-[calc(100vh-200px)] max-h-[calc(100vw-50px)] mx-auto">
+                                        {Array.from({ length: 100 }).map((_, i) => {
+                                            const s = i + 1;
+                                            const here = teams.filter(t => (gameState === 'SUMMARY' ? Math.max(1, t.score + (points[t.id] || 0) - (t.id === activeTeam.id ? penalties : 0)) : t.score) === s);
+                                            return (
+                                                <div key={s} className={`border border-white/60 rounded flex items-center justify-center relative ${s % 8 === 0 ? 'thief-space' : 'bg-white'}`}>
+                                                    <span className="absolute top-0.5 right-1 text-[2vmin] text-gray-400 font-bold">{(s-1)%8+1}</span>
+                                                    <div className="flex flex-wrap justify-center items-center h-full w-full">
+                                                        {here.length > 0 ? (
+                                                            here.map(t => <span key={t.id} className="text-[4vmin] drop-shadow-md">{t.icon}</span>)
+                                                        ) : (
+                                                            s === 100 ? <BikkurimBasket className="w-[5vmin] h-[5vmin] opacity-30" /> : null
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                                 <Credit />
                             </div>
@@ -400,38 +381,33 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4 relative text-center">
-                    {gameState !== 'SETUP' && <SettingsButton />}
                     {showInstructions && (
                         <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4 z-[9999]">
-                            <div className="bg-white rounded-[2rem] p-6 md:p-8 max-w-xl w-full shadow-2xl text-right overflow-y-auto max-h-[90vh]">
+                            <div className="bg-white rounded-3xl p-6 md:p-8 max-w-xl w-full shadow-2xl text-right overflow-y-auto max-h-[90vh]">
                                 <h2 className="text-2xl md:text-3xl font-bold text-brand-green mb-4 border-b pb-4 text-center">
                                     איך משחקים ב<ShavuAsLogo />?
                                 </h2>
-                                
                                 <div className="space-y-5 text-gray-700 text-sm md:text-base leading-relaxed">
-                                    <section className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                                        <h3 className="font-bold text-brand-green text-lg mb-2">📽️ הנחיות הקרנה למורה:</h3>
+                                    <section className="bg-green-50 p-4 rounded-2xl border border-green-100">
+                                        <h3 className="font-bold text-brand-green text-lg mb-2">📽️ הנחיות למורה (ניהול מקרן):</h3>
                                         <ol className="list-decimal list-inside space-y-1">
                                             <li>לחצו על הכפתור <b>"פתח חלון למקרן"</b> (למעלה משמאל).</li>
-                                            <li>גררו את החלון החדש שנפתח אל מסך המקרן המורחב (המסך הגדול בכיתה).</li>
-                                            <li><b>חשוב:</b> השאירו את המסך הזה (לוח הבקרה עם הכרטיסים) במחשב שלכם כך שלא יפנה לכיתה. <b>התלמידים לא אמורים לראות את המסך הזה!</b></li>
-                                            <li>הזמינו כל פעם נציג אחר מכל קבוצה של התלמידים להתקרב למחשב ולהסביר את המילים לחבריהם.</li>
+                                            <li>גררו את החלון החדש שנפתח אל מסך המקרן המורחב (המסך הגדול שפונה לכיתה).</li>
+                                            <li><b>חשוב:</b> השאירו את המסך הזה (לוח הבקרה עם הכרטיסים) במחשב האישי שלכם. <b>התלמידים לא אמורים לראות את המילים שבמסך זה!</b></li>
+                                            <li>הזמינו כל פעם נציג אחר מכל קבוצה של התלמידים להתקרב למחשב שלכם, לקרוא את המילה בכרטיס, ולהסביר אותה לחבריו.</li>
                                         </ol>
                                     </section>
-                                    
                                     <section>
                                         <h3 className="font-bold text-brand-green text-lg mb-1">🎯 מהלך המשחק:</h3>
                                         <ul className="list-disc list-inside space-y-1">
-                                            <li>נציג מהקבוצה מסביר לחבריו את המילה מבלי להגיד אותה או את שורשה.</li>
-                                            <li>המספר של המילה שעליכם להסביר מהכרטיס נקבע לפי המיקום שלכם במפה.</li>
-                                            <li><b>ניחוש נכון</b> מקדם אתכם צעד אחד קדימה. <b>דילוג</b> מוריד אתכם צעד.</li>
-                                            <li>המטרה: להגיע ראשונים לסל הביכורים במשבצת 100!</li>
+                                            <li>המספר של המילה מהכרטיס שעליכם להסביר, נקבע לפי המיקום שלכם במפה.</li>
+                                            <li>מסבירים את המילה מבלי להגיד אותה או את שורשה.</li>
+                                            <li><b>ניחוש נכון</b> מקדם צעד. <b>דילוג</b> מוריד צעד.</li>
                                         </ul>
                                     </section>
-
                                     <section>
-                                        <h3 className="font-bold text-brand-green text-lg mb-1"><SickleIcon className="w-5 h-5 inline-block ml-1" /> משבצות "הקוצר" (ירוק בהיר עם מסגרת):</h3>
-                                        <p>כשהחייל שלכם עוצר על משבצת כזו (8, 16 וכו'), מופעל סיבוב הקוצר! בסיבוב זה <b>אין טיימר וכל הקבוצות מנחשות ביחד</b>. הקבוצה שצועקת ראשונה מקבלת את הנקודה. הסיבוב נגמר אוטומטית אחרי 5 קלפים.</p>
+                                        <h3 className="font-bold text-brand-green text-lg mb-1"><SickleIcon className="w-5 h-5 inline-block ml-1" /> משבצות "הקוצר" (מסגרת ירוקה):</h3>
+                                        <p>כשהחייל שלכם עוצר על משבצת כזו (8, 16 וכו'), מופעל סיבוב הקוצר! <b>אין טיימר וכל הקבוצות מנחשות ביחד</b>. הסיבוב נגמר אוטומטית אחרי 5 קלפים.</p>
                                     </section>
                                 </div>
                                 <button onClick={() => setShowInstructions(false)} className="w-full mt-8 bg-brand-green text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-all">הבנתי, בואו נתחיל!</button>
@@ -441,19 +417,19 @@
 
                     {showEndGameConfirm && (
                         <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4 z-[9999]">
-                            <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl text-center bounce-in">
+                            <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center bounce-in">
                                 <div className="text-6xl mb-4">⚠️</div>
                                 <h2 className="text-2xl font-bold text-gray-800 mb-2">לסיים את המשחק?</h2>
-                                <p className="text-gray-600 mb-8 text-sm">פעולה זו תעצור את המשחק ותעביר אתכם מיד למסך המנצחים. האם אתם בטוחים?</p>
+                                <p className="text-gray-600 mb-8 text-sm">פעולה זו תעצור את המשחק ותעביר אתכם מיד למסך הסיכום והמנצחים.</p>
                                 <div className="flex gap-3">
                                     <button onClick={() => setShowEndGameConfirm(false)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 transition-all">ביטול</button>
-                                    <button onClick={() => { setShowEndGameConfirm(false); endGameNow(); }} className="flex-1 bg-rose-500 text-white font-bold py-3 rounded-xl shadow-md hover:bg-rose-600 transition-all active:scale-95">כן, לסיים</button>
+                                    <button onClick={() => { setShowEndGameConfirm(false); endGameNow(); }} className="flex-1 bg-rose-500 text-white font-bold py-3 rounded-xl shadow-md hover:bg-rose-600 transition-all">כן, לסיים</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <button onClick={() => window.open(window.location.href.split('?')[0] + "?mode=projector", '_blank')} className="absolute top-4 left-4 projector-btn">📽️ פתח חלון למקרן</button>
+                    <button onClick={() => window.open(window.location.href.split('?')[0] + "?mode=projector", '_blank')} className="absolute top-4 left-4 bg-white text-brand-green border border-green-100 px-4 py-1.5 rounded-full font-medium text-[11px] shadow-sm hover:bg-green-50 active:scale-95 transition-all">📽️ פתח חלון למקרן</button>
                     
                     {gameState === 'SETUP' && (
                         <div className="bg-white p-8 rounded-3xl card-shadow max-w-sm w-full border border-green-50 mt-12">
@@ -486,7 +462,7 @@
                                     </div>
                                 ))}
                                 <button onClick={() => setTeams([...teams, { id: Date.now(), name: `קבוצה ${teams.length + 1}`, icon: ICONS[teams.length % 10], score: 1 }])} className="w-full border border-dashed border-green-200 text-brand-green py-2 rounded-xl text-[11px] font-bold">+ הוסף קבוצה</button>
-                                <button onClick={() => { setGameState('BOARD'); broadcast({ gameState: 'BOARD' }); }} className="w-full mt-4 bg-brand-green text-white font-bold text-lg py-4 rounded-2xl shadow-lg active:scale-95 transition-all">בואו נשחק!</button>
+                                <button onClick={() => { setGameState('BOARD'); broadcast({ gameState: 'BOARD' }); }} className="w-full mt-4 bg-brand-green text-white font-bold text-lg py-4 rounded-2xl shadow-lg active:scale-95">בואו נשחק!</button>
                             </div>
                             <Credit />
                         </div>
@@ -495,18 +471,22 @@
                     {gameState === 'BOARD' && (
                         <div className="max-w-5xl w-full flex flex-col xl:flex-row gap-4 mx-auto mt-12">
                             <div className="xl:flex-[2.5] bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-emerald-50">
-                                <div className="flex justify-end items-center mb-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] font-medium hover:text-brand-green transition-colors">⚙️ הגדרות</button>
                                     <h2 className="text-xl font-bold text-brand-green mx-auto">מפת המשחק</h2>
                                     <button onClick={() => setShowEndGameConfirm(true)} className="text-rose-500 text-[11px] font-bold border border-rose-100 px-3 py-1 rounded-full hover:bg-rose-50 transition-colors">🏁 סיים משחק</button>
                                 </div>
-                                <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-2xl h-[400px]">
-                                    {Array.from({ length: 100 }).map((_, i) => (
-                                        <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
-                                            <span className="absolute top-0.5 right-1 text-[11px] text-gray-400 font-bold">{(i)%8+1}</span>
-                                            {teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-lg md:text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)}
-                                            {i+1 === 100 && teams.filter(t=>t.score===100).length===0 && <BikkurimBasket className="w-8 h-8 opacity-30 absolute m-auto" />}
-                                        </div>
-                                    ))}
+                                {/* יחס 1:1 למסך המורה - מונע מתיחה לחלוטין */}
+                                <div className="flex justify-center h-[400px]">
+                                    <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-2xl w-full h-full max-w-[400px]">
+                                        {Array.from({ length: 100 }).map((_, i) => (
+                                            <div key={i+1} className={`border rounded flex items-center justify-center relative ${(i+1)%8===0 ? 'thief-space' : 'bg-white border-gray-100'}`}>
+                                                <span className="absolute top-0.5 right-1 text-[11px] text-gray-400 font-bold">{(i)%8+1}</span>
+                                                {teams.filter(t => t.score === (i+1)).map(t => <span key={t.id} className={`text-lg md:text-xl ${t.id === activeTeam.id ? 'animate-bounce' : ''}`}>{t.icon}</span>)}
+                                                {i+1 === 100 && teams.filter(t=>t.score===100).length===0 && <BikkurimBasket className="w-6 h-6 opacity-30 absolute m-auto" />}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                                 <Credit />
                             </div>
@@ -539,7 +519,7 @@
                                 {!isRobbery ? (
                                     <button onClick={() => handleAnswer(activeTeam.id)} className="bg-brand-green text-white py-4 rounded-xl font-black text-xl shadow-lg active:scale-95 transition-all">✅ נכון!</button>
                                 ) : (
-                                    <div className="col-span-2 grid grid-cols-2 gap-2">
+                                    <div className="col-span-2 grid grid-cols-2 gap-2 mt-2">
                                         {teams.map(t => <button key={t.id} onClick={() => handleAnswer(t.id)} className="bg-green-50 border border-green-100 text-brand-green py-2 rounded-lg text-xs font-bold shadow-sm">{t.icon} {t.name}</button>)}
                                     </div>
                                 )}
@@ -548,44 +528,42 @@
                     )}
 
                     {gameState === 'SUMMARY' && (
-                        <div className="bg-white p-10 rounded-[2.5rem] card-shadow max-w-sm w-full text-center border border-emerald-50 mt-12">
-                            <h2 className="text-3xl font-bold text-brand-green mb-4">סיכום התור ⏰</h2>
-                            <div className="bg-gray-50 p-6 rounded-2xl mb-8 space-y-3 text-right shadow-inner">
-                                {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between items-center"><span>{t.icon} {t.name}</span><span className="text-brand-green font-black">+{points[t.id]}</span></div>) : <div className="flex justify-between text-xl font-bold"><span>נכונות:</span><span className="text-brand-green">{points[activeTeam.id] || 0}</span></div>}
-                                <div className="flex justify-between text-rose-500 font-bold"><span>דילוגים:</span><span>{penalties}</span></div>
+                        <div className="bg-white p-10 rounded-[2rem] card-shadow max-w-sm w-full text-center border border-emerald-50 mt-12">
+                            <h2 className="text-2xl font-bold text-brand-green mb-4">סיכום התור ⏰</h2>
+                            <div className="bg-gray-50 p-5 rounded-2xl mb-6 space-y-2 text-right shadow-inner">
+                                {isRobbery ? teams.map(t => (points[t.id] || 0) > 0 && <div key={t.id} className="flex justify-between"><span>{t.icon} {t.name}</span><span className="text-brand-green">+{points[t.id]}</span></div>) : <div className="flex justify-between font-bold"><span>נכונות:</span><span className="text-brand-green">{points[activeTeam.id] || 0}</span></div>}
+                                <div className="flex justify-between text-rose-500"><span>דילוגים:</span><span>{penalties}</span></div>
                             </div>
-                            <button onClick={finalize} className="w-full bg-brand-green text-white font-bold text-lg py-5 rounded-xl shadow-lg active:scale-95 transition-all">חזרה למפה 🗺️</button>
+                            <button onClick={finalize} className="w-full bg-brand-green text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95">חזרה למפה 🗺️</button>
                             <Credit />
                         </div>
                     )}
 
                     {gameState === 'WINNER' && (
-                        <div className="text-center bg-white p-12 rounded-[3rem] card-shadow border border-emerald-50 mt-12 max-w-lg w-full">
-                            <BikkurimBasket className="w-32 h-32 md:w-48 md:h-48 mx-auto mb-6 animate-bounce drop-shadow-xl" />
-                            <h1 className="text-4xl font-bold text-brand-green mb-4 tracking-tight">המשחק הסתיים!</h1>
+                        <div className="text-center bg-white p-8 md:p-10 rounded-[2.5rem] card-shadow border border-emerald-50 mt-12 max-w-sm w-full">
+                            <BikkurimBasket className="w-24 h-24 mx-auto mb-4 animate-bounce drop-shadow-lg" />
+                            <h1 className="text-3xl font-bold text-brand-green mb-6 tracking-tight">סיכום המשחק!</h1>
                             
                             {isNoPoints && (
-                                <p className="text-lg text-emerald-600/80 font-bold mb-8">עדיין לא הצטברו נקודות במשחק זה 🤷‍♂️</p>
+                                <p className="text-sm text-emerald-600/80 font-bold mb-6">לא הצטברו נקודות במשחק זה 🤷‍♂️</p>
                             )}
-                            {!isNoPoints && <div className="mb-4"></div>}
                             
-                            <div className="bg-gray-50 p-6 rounded-3xl mb-10 space-y-4">
+                            <div className="bg-gray-50 p-4 rounded-3xl mb-8 space-y-3">
                                 {teams.sort((a, b) => b.score - a.score).map((t, i) => (
-                                    <div key={t.id} className={`flex justify-between items-center p-4 rounded-2xl transition-all ${!isNoPoints && i === 0 ? 'bg-yellow-100 border-2 border-yellow-400 shadow-md animate-pulse' : 'bg-white border border-gray-100'}`}>
-                                        <div className="flex items-center gap-3">
-                                            {!isNoPoints && <span className="text-4xl">{i === 0 ? '👑' : i + 1 + '.'}</span>}
-                                            <span className="text-3xl">{t.icon}</span>
-                                            <span className={`text-2xl font-black ${!isNoPoints && i === 0 ? 'text-yellow-800' : 'text-gray-700'}`}>
-                                                {!isNoPoints && i === 0 ? `${t.name} - מקום ראשון!` : t.name}
+                                    <div key={t.id} className={`flex justify-between items-center p-3 rounded-2xl transition-all ${!isNoPoints && i === 0 ? 'bg-yellow-50 border-2 border-yellow-400 shadow-md' : 'bg-white border border-gray-100'}`}>
+                                        <div className="flex items-center gap-2">
+                                            {!isNoPoints && <span className="text-xl">{i === 0 ? '👑' : i + 1 + '.'}</span>}
+                                            <span className="text-2xl">{t.icon}</span>
+                                            <span className={`text-lg font-bold ${!isNoPoints && i === 0 ? 'text-yellow-700' : 'text-gray-700'}`}>
+                                                {!isNoPoints && i === 0 ? `${t.name} (מקום 1)` : t.name}
                                             </span>
                                         </div>
-                                        {!isNoPoints && <div className={`text-3xl font-black ${i === 0 ? 'text-yellow-600' : 'text-brand-green'}`}>{t.score}</div>}
-                                        {isNoPoints && <div className="text-xl font-bold text-gray-400">אין ניקוד</div>}
+                                        {!isNoPoints && <div className={`text-xl font-black ${i === 0 ? 'text-yellow-600' : 'text-brand-green'}`}>{t.score}</div>}
                                     </div>
                                 ))}
                             </div>
 
-                            <button onClick={resetGame} className="bg-brand-green text-white font-bold py-6 px-16 rounded-full text-2xl shadow-xl active:scale-95 transition-all w-full">משחק חדש 🔄</button>
+                            <button onClick={resetGame} className="bg-brand-green text-white font-bold py-4 px-10 rounded-full text-xl shadow-xl active:scale-95 transition-all w-full">משחק חדש 🔄</button>
                             <Credit />
                         </div>
                     )}

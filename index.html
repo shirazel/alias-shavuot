@@ -139,6 +139,28 @@
         @media (max-width: 768px) {
             .projector-btn { display: none !important; }
         }
+
+        /* סגנון כפתור הגדרות מרחף */
+        .settings-btn-floating {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background-color: white;
+            color: #9ca3af;
+            border: 1px solid #e5e7eb;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+            z-index: 50;
+        }
+        .settings-btn-floating:hover {
+            color: var(--brand-green);
+            border-color: var(--brand-green);
+            background-color: #f0fdf4;
+        }
     </style>
 </head>
 <body>
@@ -214,12 +236,13 @@
             } catch (e) {}
         };
 
-        const SYNC_KEY = 'shavu_as_sync_final_v13';
-        const channel = new BroadcastChannel('shavu_as_channel_v13');
+        const SYNC_KEY = 'shavu_as_sync_final_v16';
+        const channel = new BroadcastChannel('shavu_as_channel_v16');
 
         const App = () => {
             const [isProjector] = useState(() => window.location.search.includes('mode=projector'));
             const [showInstructions, setShowInstructions] = useState(false);
+            const [showEndGameConfirm, setShowEndGameConfirm] = useState(false);
             const [gameState, setGameState] = useState('SETUP');
             const [teams, setTeams] = useState([
                 { id: 1, name: 'קבוצה 1', icon: ICONS[0], score: 1 }, 
@@ -236,6 +259,9 @@
             const activeTeam = teams[activeIdx] || teams[0];
             const targetIdx = (activeTeam.score - 1) % 8;
             const isRobbery = activeTeam.score % 8 === 0;
+            
+            // בדיקה האם לא נצברו נקודות בכלל במשחק (כל הקבוצות על 1)
+            const isNoPoints = teams.every(t => t.score <= 1);
 
             const broadcast = useCallback((data) => {
                 if (isProjector) return;
@@ -322,11 +348,20 @@
                 setTeams(resetTeams); setGameState('SETUP'); setActiveIdx(0); setRoundDuration(60);
                 broadcast({ teams: resetTeams, gameState: 'SETUP', activeIdx: 0, roundDuration: 60 });
             };
+            
+            const goToSetup = () => {
+                setGameState('SETUP');
+                broadcast({ gameState: 'SETUP' });
+            };
 
             const Credit = () => (
                 <div className="mt-4 text-center text-[12px] md:text-[14px] font-bold text-brand-green opacity-100 hover:opacity-80 transition-opacity">
                     <a href="https://www.pisgah.org.il/" target="_blank" className="hover:underline">חג שבועות שמח - באהבה פסג"ה חדרה 🌾</a>
                 </div>
+            );
+            
+            const SettingsButton = () => (
+                <button onClick={goToSetup} className="settings-btn-floating">⚙️ הגדרות</button>
             );
 
             if (isProjector) {
@@ -365,6 +400,7 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4 relative text-center">
+                    {gameState !== 'SETUP' && <SettingsButton />}
                     {showInstructions && (
                         <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4 z-[9999]">
                             <div className="bg-white rounded-[2rem] p-6 md:p-8 max-w-xl w-full shadow-2xl text-right overflow-y-auto max-h-[90vh]">
@@ -399,6 +435,20 @@
                                     </section>
                                 </div>
                                 <button onClick={() => setShowInstructions(false)} className="w-full mt-8 bg-brand-green text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-all">הבנתי, בואו נתחיל!</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {showEndGameConfirm && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4 z-[9999]">
+                            <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl text-center bounce-in">
+                                <div className="text-6xl mb-4">⚠️</div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-2">לסיים את המשחק?</h2>
+                                <p className="text-gray-600 mb-8 text-sm">פעולה זו תעצור את המשחק ותעביר אתכם מיד למסך המנצחים. האם אתם בטוחים?</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowEndGameConfirm(false)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 transition-all">ביטול</button>
+                                    <button onClick={() => { setShowEndGameConfirm(false); endGameNow(); }} className="flex-1 bg-rose-500 text-white font-bold py-3 rounded-xl shadow-md hover:bg-rose-600 transition-all active:scale-95">כן, לסיים</button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -445,10 +495,9 @@
                     {gameState === 'BOARD' && (
                         <div className="max-w-5xl w-full flex flex-col xl:flex-row gap-4 mx-auto mt-12">
                             <div className="xl:flex-[2.5] bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-emerald-50">
-                                <div className="flex justify-between items-center mb-4">
-                                    <button onClick={() => setGameState('SETUP')} className="text-gray-400 text-[11px] font-medium hover:text-brand-green transition-colors">⚙️ הגדרות</button>
-                                    <h2 className="text-xl font-bold text-brand-green">מפת המשחק</h2>
-                                    <button onClick={endGameNow} className="text-rose-500 text-[11px] font-bold border border-rose-100 px-3 py-1 rounded-full hover:bg-rose-50 transition-colors">🏁 סיים משחק</button>
+                                <div className="flex justify-end items-center mb-4">
+                                    <h2 className="text-xl font-bold text-brand-green mx-auto">מפת המשחק</h2>
+                                    <button onClick={() => setShowEndGameConfirm(true)} className="text-rose-500 text-[11px] font-bold border border-rose-100 px-3 py-1 rounded-full hover:bg-rose-50 transition-colors">🏁 סיים משחק</button>
                                 </div>
                                 <div className="board-grid bg-gray-50 p-1 md:p-2 rounded-2xl h-[400px]">
                                     {Array.from({ length: 100 }).map((_, i) => (
@@ -513,16 +562,25 @@
                     {gameState === 'WINNER' && (
                         <div className="text-center bg-white p-12 rounded-[3rem] card-shadow border border-emerald-50 mt-12 max-w-lg w-full">
                             <BikkurimBasket className="w-32 h-32 md:w-48 md:h-48 mx-auto mb-6 animate-bounce drop-shadow-xl" />
-                            <h1 className="text-4xl font-bold text-brand-green mb-8 tracking-tight">המשחק הסתיים!</h1>
+                            <h1 className="text-4xl font-bold text-brand-green mb-4 tracking-tight">המשחק הסתיים!</h1>
+                            
+                            {isNoPoints && (
+                                <p className="text-lg text-emerald-600/80 font-bold mb-8">עדיין לא הצטברו נקודות במשחק זה 🤷‍♂️</p>
+                            )}
+                            {!isNoPoints && <div className="mb-4"></div>}
                             
                             <div className="bg-gray-50 p-6 rounded-3xl mb-10 space-y-4">
                                 {teams.sort((a, b) => b.score - a.score).map((t, i) => (
-                                    <div key={t.id} className={`flex justify-between items-center p-4 rounded-2xl transition-all animate-pulse ${i === 0 ? 'bg-yellow-100 border-2 border-yellow-400 shadow-md' : 'bg-white border border-gray-100'}`}>
+                                    <div key={t.id} className={`flex justify-between items-center p-4 rounded-2xl transition-all ${!isNoPoints && i === 0 ? 'bg-yellow-100 border-2 border-yellow-400 shadow-md animate-pulse' : 'bg-white border border-gray-100'}`}>
                                         <div className="flex items-center gap-3">
-                                            <span className="text-4xl">{i === 0 ? '🏆' : t.icon}</span>
-                                            <span className={`text-2xl font-black ${i === 0 ? 'text-yellow-800' : 'text-gray-700'}`}>{i === 0 ? `${t.name} - מקום ראשון!` : t.name}</span>
+                                            {!isNoPoints && <span className="text-4xl">{i === 0 ? '👑' : i + 1 + '.'}</span>}
+                                            <span className="text-3xl">{t.icon}</span>
+                                            <span className={`text-2xl font-black ${!isNoPoints && i === 0 ? 'text-yellow-800' : 'text-gray-700'}`}>
+                                                {!isNoPoints && i === 0 ? `${t.name} - מקום ראשון!` : t.name}
+                                            </span>
                                         </div>
-                                        <div className={`text-3xl font-black ${i === 0 ? 'text-yellow-600' : 'text-brand-green'}`}>{t.score}</div>
+                                        {!isNoPoints && <div className={`text-3xl font-black ${i === 0 ? 'text-yellow-600' : 'text-brand-green'}`}>{t.score}</div>}
+                                        {isNoPoints && <div className="text-xl font-bold text-gray-400">אין ניקוד</div>}
                                     </div>
                                 ))}
                             </div>
